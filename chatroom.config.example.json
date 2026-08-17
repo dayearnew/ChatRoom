@@ -1,0 +1,24 @@
+{
+  "allowedRoots": ["/home/user/Projects"],
+  "dataDir": "/home/user/.local/share/chatroom",
+  "databasePath": "/home/user/.local/state/chatroom/chatroom.sqlite",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8765
+  },
+  "auth": {
+    "localWebAuth": false,
+    "ownerToken": null,
+    "mcpPublicBaseUrl": null,
+    "webPublicBaseUrl": null,
+    "allowedRedirectHosts": ["chatgpt.com", "localhost", "127.0.0.1"]
+  },
+  "operations": {
+    "maxPayloadBytes": 524288
+  },
+  "process": {
+    "maxOutputBytes": 524288,
+    "defaultTimeoutMs": 1800000,
+    "maxCompletedProcesses": 200
+  }
+}
