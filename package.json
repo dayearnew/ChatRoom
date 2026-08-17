@@ -1,0 +1,77 @@
+{
+  "name": "@chatroomcp/chatroom",
+  "version": "0.1.3",
+  "type": "module",
+  "description": "Local MCP runtime for ChatGPT with workspace, process, Cloud, and WebUI controls.",
+  "bin": {
+    "chatroom": "dist/cli/index.js"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "format": "prettier --write \"src/**/*.{ts,vue,css,html}\" \"test/**/*.ts\" \"scripts/**/*.mjs\" \"*.{json,ts}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,vue,css,html}\" \"test/**/*.ts\" \"scripts/**/*.mjs\" \"*.{json,ts}\"",
+    "dev": "tsx watch src/cli/index.ts serve",
+    "build:web": "vite build",
+    "build:server": "tsc -p tsconfig.build.json",
+    "build": "npm run clean && npm run build:web && npm run build:server",
+    "typecheck:server": "tsc -p tsconfig.json --noEmit",
+    "typecheck:web": "vue-tsc -p tsconfig.web.json --noEmit",
+    "typecheck": "npm run typecheck:server && npm run typecheck:web",
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "test": "node --import tsx --test 'test/**/*.test.ts'",
+    "check": "npm run format:check && npm run typecheck && npm run check:architecture && npm test && npm run build",
+    "start": "node dist/cli/index.js serve",
+    "release": "npm publish --tag latest --access public",
+    "prepack": "npm run check"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@simplewebauthn/server": "13.3.2",
+    "express": "^5.1.0",
+    "ws": "^8.18.3",
+    "zod": "^4.0.17"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.1.0"
+  },
+  "devDependencies": {
+    "@mdi/font": "^7.4.47",
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.2.1",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "highlight.js": "^11.12.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.2",
+    "vite-plugin-vuetify": "^2.1.3",
+    "vue": "^3.5.41",
+    "vue-tsc": "^3.3.9",
+    "vuetify": "^4.1.9"
+  },
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://chatroomcp.com/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dayearnew/ChatRoom.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dayearnew/ChatRoom/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "latest"
+  },
+  "files": [
+    "dist",
+    "assets",
+    "chatroom.config.example.json"
+  ]
+}
