@@ -228,6 +228,17 @@ export class CloudController {
       this.publishExternalAccess();
       return;
     }
+    if (!this.state.publicPrefix) {
+      if (this.state.lease) {
+        this.state = { ...this.state, lease: null };
+        await this.store.save(this.state);
+      }
+      this.tunnel?.drainAndStop();
+      this.tunnel = null;
+      this.connection = "inactive";
+      this.publishExternalAccess();
+      return;
+    }
     const current = this.state.lease;
     const sameServices =
       current &&
