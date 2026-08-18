@@ -89,6 +89,12 @@ export class CloudController {
     if (this.state.lease) this.connection = "disconnected";
   }
 
+  async registerDevice(): Promise<CloudStatus> {
+    await this.api.registerDevice(this.identity());
+    this.lastError = null;
+    return this.status();
+  }
+
   async managementUrl(): Promise<{ url: string; expiresAt: string }> {
     const current = this.state.managementSession;
     if (current && Date.parse(current.expiresAt) > Date.now()) {

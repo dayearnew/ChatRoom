@@ -1,26 +1,23 @@
-import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import type { OperationLog } from "../../operations/operation-log.js";
+import type { PluginMcpRegistrar } from "../../mcp/server/plugin-mcp-registrar.js";
 import {
   closedRead,
   destructiveLocalMutation,
-  mcpTool,
   openWorldMutation,
   processSnapshotSchema,
 } from "../../mcp/server/tool-support.js";
 import type { ProcessSupervisor } from "./process-supervisor.js";
 
 export function registerProcessTools(
-  server: McpServer,
+  mcp: PluginMcpRegistrar,
   processes: ProcessSupervisor,
-  operations: OperationLog,
 ): void {
-  server.registerTool(
+  mcp.registerTool(
     "process_start",
     {
       title: "Start process",
       description:
-        "Start a supervised pipe or PTY process. Returns a ProcessId immediately.",
+        "Start a supervised executable directly and return a ProcessId immediately. Prefer invoking the target executable without a shell. For compound shell commands, use bash -c rather than bash -lc unless login-shell semantics are explicitly required, because a login shell may replace the inherited PATH (for example, removing NVM-managed Node.js commands).",
       inputSchema: z.object({
         command: z.string().min(1),
         args: z.array(z.string()).default([]),
@@ -31,33 +28,27 @@ export function registerProcessTools(
       }),
       outputSchema: processSnapshotSchema,
       annotations: openWorldMutation,
+      action: "start",
     },
-    mcpTool(
-      (input: {
-        command: string;
-        args: string[];
-        cwd: string;
-        env?: Record<string, string> | undefined;
-        pty: boolean;
-        timeoutMs?: number | undefined;
-      }) =>
-        processes.start(
-          {
-            cwd: input.cwd,
-            command: input.command,
-            args: input.args,
-            ...(input.env ? { env: input.env } : {}),
-            pty: input.pty,
-            ...(input.timeoutMs === undefined
-              ? {}
-              : { timeoutMs: input.timeoutMs }),
-          },
-          { source: "mcp" },
-        ),
-    ),
+    (input, execution) => {
+      execution.deferCompletion();
+      return processes.start(
+        {
+          cwd: input.cwd,
+          command: input.command,
+          args: input.args,
+          ...(input.env ? { env: input.env } : {}),
+          pty: input.pty,
+          ...(input.timeoutMs === undefined
+            ? {}
+            : { timeoutMs: input.timeoutMs }),
+        },
+        { source: "mcp", operationId: execution.operationId },
+      );
+    },
   );
 
-  server.registerTool(
+  mcp.registerTool(
     "process_read",
     {
       title: "Read process",
@@ -65,22 +56,12 @@ export function registerProcessTools(
       inputSchema: z.object({ processId: z.string() }),
       outputSchema: processSnapshotSchema,
       annotations: closedRead,
+      action: "read",
     },
-    mcpTool((input: { processId: string }) =>
-      operations.run(
-        {
-          pluginId: "process",
-          source: "mcp",
-          action: "read",
-          processId: input.processId,
-          input,
-        },
-        () => Promise.resolve(processes.read(input.processId)),
-      ),
-    ),
+    (input) => processes.read(input.processId),
   );
 
-  server.registerTool(
+  mcp.registerTool(
     "process_write",
     {
       title: "Write process stdin",
@@ -88,22 +69,12 @@ export function registerProcessTools(
       inputSchema: z.object({ processId: z.string(), data: z.string() }),
       outputSchema: processSnapshotSchema,
       annotations: openWorldMutation,
+      action: "write",
     },
-    mcpTool((input: { processId: string; data: string }) =>
-      operations.run(
-        {
-          pluginId: "process",
-          source: "mcp",
-          action: "write",
-          processId: input.processId,
-          input,
-        },
-        () => Promise.resolve(processes.write(input.processId, input.data)),
-      ),
-    ),
+    (input) => processes.write(input.processId, input.data),
   );
 
-  server.registerTool(
+  mcp.registerTool(
     "process_kill",
     {
       title: "Stop process",
@@ -114,18 +85,8 @@ export function registerProcessTools(
       }),
       outputSchema: processSnapshotSchema,
       annotations: destructiveLocalMutation,
+      action: (input) => (input.force ? "kill" : "terminate"),
     },
-    mcpTool((input: { processId: string; force: boolean }) =>
-      operations.run(
-        {
-          pluginId: "process",
-          source: "mcp",
-          action: input.force ? "kill" : "terminate",
-          processId: input.processId,
-          input,
-        },
-        () => Promise.resolve(processes.kill(input.processId, input.force)),
-      ),
-    ),
+    (input) => processes.kill(input.processId, input.force),
   );
 }

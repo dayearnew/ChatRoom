@@ -14,6 +14,12 @@ const recoveryCredentialSchema = z
     recoveryKey: z.string().regex(/^crr\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/),
   })
   .strict();
+const registrationSchema = z
+  .object({
+    installationId: z.string().uuid(),
+    registered: z.literal(true),
+  })
+  .strict();
 const sessionSchema = z
   .object({
     purchaseToken: z.string().min(24),
@@ -47,6 +53,20 @@ const prefixSchema = z
 
 export class CloudApiClient {
   constructor(private readonly baseUrl: string) {}
+
+  async registerDevice(
+    identity: DeviceIdentity,
+  ): Promise<z.infer<typeof registrationSchema>> {
+    const payload = { devicePublicKey: identity.devicePublicKey };
+    return registrationSchema.parse(
+      await this.devicePost(
+        "/v1/device/register",
+        "register",
+        identity,
+        payload,
+      ),
+    );
+  }
 
   async createManagementSession(
     identity: DeviceIdentity,

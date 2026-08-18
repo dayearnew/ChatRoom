@@ -1,4 +1,3 @@
-import type { OperationLog } from "../../operations/operation-log.js";
 import { CommandRunner } from "../../core/runtime/command-runner.js";
 import type { InternalPlugin } from "../types.js";
 import { createServiceToken } from "../types.js";
@@ -20,7 +19,6 @@ export const WorkspaceService =
 
 export function createWorkspacePlugin(): InternalPlugin {
   let value: WorkspacePluginService | null = null;
-  let operations: OperationLog | null = null;
 
   return {
     id: "workspace",
@@ -38,17 +36,14 @@ export function createWorkspacePlugin(): InternalPlugin {
       );
       await workspaces.discoverGitWorkspaces();
       value = { workspaces, git };
-      operations = context.operations;
       context.services.provide(WorkspaceService, value);
     },
-    registerMcp(server) {
-      if (!value || !operations)
-        throw new Error("Workspace plugin is not active");
-      registerWorkspaceTools(server, value.workspaces, operations);
+    registerMcp(mcp) {
+      if (!value) throw new Error("Workspace plugin is not active");
+      registerWorkspaceTools(mcp, value.workspaces);
     },
     deactivate() {
       value = null;
-      operations = null;
     },
   };
 }

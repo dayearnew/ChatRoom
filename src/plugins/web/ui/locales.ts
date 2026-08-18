@@ -24,6 +24,9 @@ const enChatRoom = {
     publicPrefix: "Public prefix",
     prefixHint: "3-32 lowercase letters, numbers, or hyphens.",
     savePrefix: "Save",
+    installationId: "Installation ID",
+    registerDevice: "Register device",
+    registered: "Registered",
     remoteMcp: "Remote MCP",
     remoteMcpDescription: "Expose MCP through ChatRoom Cloud.",
     remoteWeb: "Remote WebUI",
@@ -203,6 +206,7 @@ const enChatRoom = {
     restoreCloud: "Restore Cloud subscription",
     replaceRecoveryKey: "Replace recovery key",
     setCloudPrefix: "Set Cloud prefix",
+    registerCloudDevice: "Register Cloud device",
     setCloudService: "Set Cloud service",
   },
 };
@@ -229,6 +233,9 @@ const zhChatRoom: typeof enChatRoom = {
     publicPrefix: "公网前缀",
     prefixHint: "3-32 位小写字母、数字或连字符。",
     savePrefix: "保存",
+    installationId: "安装 ID",
+    registerDevice: "注册设备",
+    registered: "已注册",
     remoteMcp: "远程 MCP",
     remoteMcpDescription: "通过 ChatRoom Cloud 暴露 MCP。",
     remoteWeb: "远程 WebUI",
@@ -407,6 +414,7 @@ const zhChatRoom: typeof enChatRoom = {
     restoreCloud: "恢复 Cloud 订阅",
     replaceRecoveryKey: "更换恢复密钥",
     setCloudPrefix: "设置 Cloud 前缀",
+    registerCloudDevice: "注册 Cloud 设备",
     setCloudService: "设置 Cloud 服务",
   },
 };
@@ -435,6 +443,7 @@ const actionKeys: Record<string, string> = {
   restore: "restoreCloud",
   "recovery-key.replace": "replaceRecoveryKey",
   "prefix.set": "setCloudPrefix",
+  register: "registerCloudDevice",
   "service.set": "setCloudService",
 };
 

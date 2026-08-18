@@ -1,6 +1,5 @@
-import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import type { OperationLog } from "../../operations/operation-log.js";
+import type { PluginMcpRegistrar } from "../../mcp/server/plugin-mcp-registrar.js";
 import {
   changeSetSchema,
   closedRead,
@@ -10,18 +9,16 @@ import {
   fileWriteOutputSchema,
   localMutation,
   localWrite,
-  mcpTool,
   searchMatchSchema,
   workspaceOutputSchema,
 } from "../../mcp/server/tool-support.js";
 import type { WorkspaceService } from "./workspace-service.js";
 
 export function registerWorkspaceTools(
-  server: McpServer,
+  mcp: PluginMcpRegistrar,
   workspaces: WorkspaceService,
-  operations: OperationLog,
 ): void {
-  server.registerTool(
+  mcp.registerTool(
     "open_workspace",
     {
       title: "Open workspace",
@@ -33,21 +30,16 @@ export function registerWorkspaceTools(
       }),
       outputSchema: workspaceOutputSchema,
       annotations: localMutation,
+      action: "open",
     },
-    mcpTool(
-      (input: { path: string; mode?: "checkout" | "worktree" | undefined }) =>
-        operations.run(
-          { pluginId: "workspace", source: "mcp", action: "open", input },
-          () =>
-            workspaces.open({
-              path: input.path,
-              ...(input.mode ? { mode: input.mode } : {}),
-            }),
-        ),
-    ),
+    (input) =>
+      workspaces.open({
+        path: input.path,
+        ...(input.mode ? { mode: input.mode } : {}),
+      }),
   );
 
-  server.registerTool(
+  mcp.registerTool(
     "remove_workspace",
     {
       title: "Remove workspace",
@@ -63,25 +55,18 @@ export function registerWorkspaceTools(
         mode: z.enum(["checkout", "worktree"]),
       }),
       annotations: destructiveLocalMutation,
+      action: "remove",
     },
-    mcpTool(
-      async (input: { workspaceId: string; force?: boolean | undefined }) => {
-        const removed = await operations.run(
-          {
-            pluginId: "workspace",
-            source: "mcp",
-            action: "remove",
-            workspaceId: input.workspaceId,
-            input,
-          },
-          () => workspaces.remove(input.workspaceId, input.force ?? false),
-        );
-        return { removed: true, workspaceId: removed.id, mode: removed.mode };
-      },
-    ),
+    async (input) => {
+      const removed = await workspaces.remove(
+        input.workspaceId,
+        input.force ?? false,
+      );
+      return { removed: true, workspaceId: removed.id, mode: removed.mode };
+    },
   );
 
-  server.registerTool(
+  mcp.registerTool(
     "fs_read",
     {
       title: "Read file",
@@ -99,33 +84,18 @@ export function registerWorkspaceTools(
       }),
       outputSchema: fileReadOutputSchema,
       annotations: closedRead,
+      action: "fs.read",
     },
-    mcpTool(
-      async (input: {
-        workspaceId: string;
-        path: string;
-        maxBytes?: number | undefined;
-      }) => {
-        const fs = await workspaces.fs(input.workspaceId);
-        return operations.run(
-          {
-            pluginId: "workspace",
-            source: "mcp",
-            action: "fs.read",
-            workspaceId: input.workspaceId,
-            input,
-          },
-          () =>
-            fs.read(
-              input.path,
-              input.maxBytes === undefined ? {} : { maxBytes: input.maxBytes },
-            ),
-        );
-      },
-    ),
+    async (input) => {
+      const fs = await workspaces.fs(input.workspaceId);
+      return fs.read(
+        input.path,
+        input.maxBytes === undefined ? {} : { maxBytes: input.maxBytes },
+      );
+    },
   );
 
-  server.registerTool(
+  mcp.registerTool(
     "fs_write",
     {
       title: "Write file",
@@ -137,25 +107,15 @@ export function registerWorkspaceTools(
       }),
       outputSchema: fileWriteOutputSchema,
       annotations: localWrite,
+      action: "fs.write",
     },
-    mcpTool(
-      async (input: { workspaceId: string; path: string; content: string }) => {
-        const fs = await workspaces.fs(input.workspaceId);
-        return operations.run(
-          {
-            pluginId: "workspace",
-            source: "mcp",
-            action: "fs.write",
-            workspaceId: input.workspaceId,
-            input,
-          },
-          () => fs.write(input.path, input.content),
-        );
-      },
-    ),
+    async (input) => {
+      const fs = await workspaces.fs(input.workspaceId);
+      return fs.write(input.path, input.content);
+    },
   );
 
-  server.registerTool(
+  mcp.registerTool(
     "fs_list",
     {
       title: "List files",
@@ -167,31 +127,17 @@ export function registerWorkspaceTools(
       }),
       outputSchema: z.object({ files: z.array(fileInfoSchema) }),
       annotations: closedRead,
+      action: "fs.list",
     },
-    mcpTool(
-      async (input: {
-        workspaceId: string;
-        path: string;
-        recursive: boolean;
-      }) => {
-        const fs = await workspaces.fs(input.workspaceId);
-        return {
-          files: await operations.run(
-            {
-              pluginId: "workspace",
-              source: "mcp",
-              action: "fs.list",
-              workspaceId: input.workspaceId,
-              input,
-            },
-            () => fs.list(input.path, { recursive: input.recursive }),
-          ),
-        };
-      },
-    ),
+    async (input) => {
+      const fs = await workspaces.fs(input.workspaceId);
+      return {
+        files: await fs.list(input.path, { recursive: input.recursive }),
+      };
+    },
   );
 
-  server.registerTool(
+  mcp.registerTool(
     "fs_search",
     {
       title: "Search files",
@@ -204,36 +150,20 @@ export function registerWorkspaceTools(
       }),
       outputSchema: z.object({ matches: z.array(searchMatchSchema) }),
       annotations: closedRead,
+      action: "fs.search",
     },
-    mcpTool(
-      async (input: {
-        workspaceId: string;
-        query: string;
-        path: string;
-        maxResults: number;
-      }) => {
-        const fs = await workspaces.fs(input.workspaceId);
-        return {
-          matches: await operations.run(
-            {
-              pluginId: "workspace",
-              source: "mcp",
-              action: "fs.search",
-              workspaceId: input.workspaceId,
-              input,
-            },
-            () =>
-              fs.search(input.query, {
-                path: input.path,
-                maxResults: input.maxResults,
-              }),
-          ),
-        };
-      },
-    ),
+    async (input) => {
+      const fs = await workspaces.fs(input.workspaceId);
+      return {
+        matches: await fs.search(input.query, {
+          path: input.path,
+          maxResults: input.maxResults,
+        }),
+      };
+    },
   );
 
-  server.registerTool(
+  mcp.registerTool(
     "fs_patch",
     {
       title: "Transactional patch",
@@ -256,39 +186,20 @@ export function registerWorkspaceTools(
       }),
       outputSchema: changeSetSchema,
       annotations: destructiveLocalMutation,
+      action: "fs.patch",
     },
-    mcpTool(
-      async (input: {
-        workspaceId: string;
-        replacements: Array<{
-          path: string;
-          oldText: string;
-          newText: string;
-          occurrence?: number | "all" | undefined;
-        }>;
-      }) => {
-        const fs = await workspaces.fs(input.workspaceId);
-        return operations.run(
-          {
-            pluginId: "workspace",
-            source: "mcp",
-            action: "fs.patch",
-            workspaceId: input.workspaceId,
-            input,
-          },
-          () =>
-            fs.patch(
-              input.replacements.map((item) => ({
-                path: item.path,
-                oldText: item.oldText,
-                newText: item.newText,
-                ...(item.occurrence === undefined
-                  ? {}
-                  : { occurrence: item.occurrence }),
-              })),
-            ),
-        );
-      },
-    ),
+    async (input) => {
+      const fs = await workspaces.fs(input.workspaceId);
+      return fs.patch(
+        input.replacements.map((item) => ({
+          path: item.path,
+          oldText: item.oldText,
+          newText: item.newText,
+          ...(item.occurrence === undefined
+            ? {}
+            : { occurrence: item.occurrence }),
+        })),
+      );
+    },
   );
 }

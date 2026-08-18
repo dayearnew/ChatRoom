@@ -13,6 +13,17 @@ export function createCloudApiRouter(
   router.get("/cloud/status", (_req, res) => res.json(controller.status()));
 
   router.post(
+    "/cloud/register",
+    asyncRoute(async (_req, res) =>
+      res.json(
+        await operations.run(
+          { pluginId: "cloud", source: "gui", action: "register" },
+          () => controller.registerDevice(),
+        ),
+      ),
+    ),
+  );
+  router.post(
     "/cloud/sync",
     asyncRoute(async (_req, res) =>
       res.json(
