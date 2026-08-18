@@ -333,6 +333,25 @@ body {
   flex: 0 0 auto;
 }
 
+.cloud-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.cloud-prefix-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(220px, 320px) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 18px;
+}
+
+.cloud-prefix-copy {
+  min-width: 0;
+}
+
 .cloud-restore-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -432,11 +451,21 @@ body {
 .table-shell {
   width: 100%;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+.table-shell .v-table {
+  min-width: 760px;
 }
 
 .table-shell table {
   width: 100%;
+}
+
+.table-shell .v-table thead th,
+.table-shell .v-table tbody td {
+  white-space: nowrap;
 }
 
 .operation-table table,
@@ -567,11 +596,6 @@ body {
 
 .operations-layout {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.operations-layout .operation-col-source,
-.operations-layout .operation-col-duration {
-  display: none !important;
 }
 
 .operations-layout .operation-col-time {
@@ -1374,11 +1398,6 @@ body {
     white-space: nowrap;
   }
 
-  .process-col-started,
-  .process-col-duration {
-    display: none !important;
-  }
-
   .workspace-files-layout {
     grid-template-columns: 1fr;
   }
@@ -1402,6 +1421,19 @@ body {
   .metric-grid {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
+  }
+
+  .cloud-prefix-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .cloud-prefix-row .v-btn {
+    justify-self: end;
+  }
+
+  .cloud-row-actions {
+    gap: 2px;
   }
 
   .metric-card {
@@ -1529,11 +1561,6 @@ body {
   .operation-filters .v-btn {
     flex: 0 0 auto;
     min-height: 38px;
-  }
-
-  .operation-col-source,
-  .operation-col-duration {
-    display: none !important;
   }
 
   .operation-col-time {

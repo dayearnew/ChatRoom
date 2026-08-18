@@ -212,6 +212,16 @@ function syncViewFromPath() {
   view.value = viewFromPath();
 }
 
+function formatUptime(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return locale.t(
+    "$vuetify.chatroom.runtime.uptimeHoursMinutes",
+    hours,
+    minutes,
+  );
+}
+
 async function login() {
   loginError.value = "";
   try {
@@ -367,12 +377,7 @@ async function removePasskey(id: string) {
             <div class="drawer-runtime-row">
               <span>{{ locale.t("$vuetify.chatroom.runtime.uptime") }}</span>
               <strong>{{
-                runtime
-                  ? locale.t(
-                      "$vuetify.chatroom.runtime.uptimeMinutes",
-                      runtime.uptimeMinutes,
-                    )
-                  : "—"
+                runtime ? formatUptime(runtime.uptimeMinutes) : "—"
               }}</strong>
             </div>
           </div>
