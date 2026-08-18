@@ -1,4 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/server";
+import { PluginMcpRegistrar } from "../mcp/server/plugin-mcp-registrar.js";
 import type { InternalPlugin, PluginContext } from "./types.js";
 
 export class PluginManager {
@@ -17,7 +18,12 @@ export class PluginManager {
   }
 
   registerMcp(server: McpServer): void {
-    for (const plugin of this.active) plugin.registerMcp?.(server);
+    for (const plugin of this.active) {
+      if (!plugin.registerMcp) continue;
+      plugin.registerMcp(
+        new PluginMcpRegistrar(server, this.context.operations, plugin.id),
+      );
+    }
   }
 
   async stop(): Promise<void> {

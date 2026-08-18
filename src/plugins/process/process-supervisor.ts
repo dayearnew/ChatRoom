@@ -37,6 +37,7 @@ interface ManagedProcess {
 interface ProcessOperationContext {
   source: OperationSource;
   action?: string;
+  operationId?: string;
 }
 
 export class ProcessSupervisor {
@@ -63,20 +64,24 @@ export class ProcessSupervisor {
       );
     const processId = `proc_${randomUUID()}`;
     const args = request.args ?? [];
-    const operation = this.operations.start({
-      pluginId: "process",
-      source: operationContext.source,
-      action: operationContext.action ?? "start",
-      processId,
-      input: {
-        command: request.command,
-        args,
-        cwd: request.cwd,
-        pty: request.pty ?? false,
-        timeoutMs: request.timeoutMs ?? this.defaultTimeoutMs,
-        env: request.env ?? {},
-      },
-    });
+    const adoptedOperation = operationContext.operationId !== undefined;
+    const operationId =
+      operationContext.operationId ??
+      this.operations.start({
+        pluginId: "process",
+        source: operationContext.source,
+        action: operationContext.action ?? "start",
+        processId,
+        input: {
+          command: request.command,
+          args,
+          cwd: request.cwd,
+          pty: request.pty ?? false,
+          timeoutMs: request.timeoutMs ?? this.defaultTimeoutMs,
+          env: request.env ?? {},
+        },
+      }).operationId;
+    if (adoptedOperation) this.operations.associate(operationId, { processId });
     let backend: BackendProcess;
     try {
       // Child environments inherit only the runtime allowlist, then apply explicit request overrides.
@@ -87,7 +92,8 @@ export class ProcessSupervisor {
         env: childEnvironment(request.env),
       });
     } catch (error) {
-      this.operations.finish(operation.operationId, "error", null, error);
+      if (!adoptedOperation)
+        this.operations.finish(operationId, "error", null, error);
       throw new ChatRoomError(
         "PROCESS_FAILED",
         `Failed to start process: ${request.command}`,
@@ -112,7 +118,7 @@ export class ProcessSupervisor {
       timeout: null,
       forceTimeout: null,
       timedOut: false,
-      operationId: operation.operationId,
+      operationId,
       settled,
       resolveSettled,
     };

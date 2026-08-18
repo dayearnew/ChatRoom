@@ -131,6 +131,43 @@ test("HTTP API and real MCP client share the same Application runtime", async ()
       detailed.some((operation) => operation.action.startsWith("mcp.")),
       false,
     );
+
+    const startedProcess = await client.callTool({
+      name: "process_start",
+      arguments: {
+        command: process.execPath,
+        args: ["-e", "setTimeout(() => {}, 5000)"],
+        cwd: runtime.workspaceRoot,
+        timeoutMs: 5000,
+      },
+    });
+    assert.equal(startedProcess.isError, undefined);
+    const processSnapshot = startedProcess.structuredContent as {
+      processId: string;
+      operationId: string;
+    };
+    const processOperation = runtime.components.operations.get(
+      processSnapshot.operationId,
+    );
+    assert.equal(processOperation?.pluginId, "process");
+    assert.equal(processOperation?.source, "mcp");
+    assert.equal(processOperation?.action, "start");
+    assert.equal(processOperation?.processId, processSnapshot.processId);
+    assert.equal(processOperation?.status, "running");
+    assert.equal(
+      runtime.components.operations
+        .list({ limit: 100 })
+        .filter(
+          (operation) =>
+            operation.pluginId === "process" && operation.action === "start",
+        ).length,
+      1,
+      "process_start should reuse the framework-created operation",
+    );
+    await client.callTool({
+      name: "process_kill",
+      arguments: { processId: processSnapshot.processId, force: true },
+    });
   } finally {
     await client?.close().catch(() => undefined);
     await runtime.cleanup();

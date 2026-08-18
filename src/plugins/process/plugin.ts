@@ -1,4 +1,3 @@
-import type { OperationLog } from "../../operations/operation-log.js";
 import type { InternalPlugin } from "../types.js";
 import { createServiceToken } from "../types.js";
 import { PipeProcessBackend } from "./infrastructure/pipe-process-backend.js";
@@ -10,7 +9,6 @@ export const ProcessService = createServiceToken<ProcessSupervisor>("process");
 
 export function createProcessPlugin(): InternalPlugin {
   let service: ProcessSupervisor | null = null;
-  let operations: OperationLog | null = null;
 
   return {
     id: "process",
@@ -23,18 +21,15 @@ export function createProcessPlugin(): InternalPlugin {
         context.config.process.defaultTimeoutMs,
         context.config.process.maxCompletedProcesses,
       );
-      operations = context.operations;
       context.services.provide(ProcessService, service);
     },
-    registerMcp(server) {
-      if (!service || !operations)
-        throw new Error("Process plugin is not active");
-      registerProcessTools(server, service, operations);
+    registerMcp(mcp) {
+      if (!service) throw new Error("Process plugin is not active");
+      registerProcessTools(mcp, service);
     },
     async deactivate() {
       await service?.shutdown();
       service = null;
-      operations = null;
     },
   };
 }

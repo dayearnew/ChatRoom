@@ -32,6 +32,8 @@ const restoring = ref(false);
 const refreshing = ref(false);
 const prefix = ref("");
 const prefixSaving = ref(false);
+const registering = ref(false);
+const registrationComplete = ref(false);
 
 const subscribed = computed(() => {
   const services = new Set(
@@ -85,6 +87,23 @@ async function load() {
     applyStatus(await api<CloudStatus>("/cloud/status"));
   } catch (value) {
     error.value = (value as Error).message;
+  }
+}
+
+async function registerDevice() {
+  registering.value = true;
+  registrationComplete.value = false;
+  error.value = "";
+  try {
+    applyStatus(
+      await api<CloudStatus>("/cloud/register", { method: "POST" }),
+      true,
+    );
+    registrationComplete.value = true;
+  } catch (value) {
+    error.value = (value as Error).message;
+  } finally {
+    registering.value = false;
   }
 }
 
@@ -316,6 +335,39 @@ async function restore() {
       <div v-else class="cloud-loading">
         <v-progress-circular indeterminate size="20" width="2" />
       </div>
+
+      <template v-if="status">
+        <v-divider />
+        <div class="cloud-row cloud-installation-row">
+          <div class="cloud-row-main">
+            <div class="cloud-row-title">
+              {{ locale.t("$vuetify.chatroom.cloud.installationId") }}
+            </div>
+            <div class="cloud-row-value mono installation-id">
+              {{ status.installationId }}
+            </div>
+          </div>
+          <div class="cloud-row-actions">
+            <v-chip
+              v-if="registrationComplete"
+              color="success"
+              size="small"
+              variant="tonal"
+            >
+              {{ locale.t("$vuetify.chatroom.cloud.registered") }}
+            </v-chip>
+            <v-btn
+              color="primary"
+              variant="tonal"
+              size="small"
+              :loading="registering"
+              @click="registerDevice"
+            >
+              {{ locale.t("$vuetify.chatroom.cloud.registerDevice") }}
+            </v-btn>
+          </div>
+        </div>
+      </template>
     </v-card>
   </div>
 </template>

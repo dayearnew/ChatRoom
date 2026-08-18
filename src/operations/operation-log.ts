@@ -120,6 +120,20 @@ export class OperationLog {
     return this.repository.get(operationId);
   }
 
+  associate(
+    operationId: string,
+    references: { workspaceId?: string | null; processId?: string | null },
+  ): Operation {
+    const operation = this.require(operationId);
+    if (references.workspaceId !== undefined)
+      operation.workspaceId = references.workspaceId;
+    if (references.processId !== undefined)
+      operation.processId = references.processId;
+    this.repository.update(operation);
+    this.eventBus.emit({ type: "operation", operation });
+    return operation;
+  }
+
   clearHistory(): { deleted: number; preserved: number } {
     const result = this.repository.clearHistory();
     this.eventBus.emit({ type: "operations-cleared", ...result });

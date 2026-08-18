@@ -1,6 +1,6 @@
-import type { McpServer } from "@modelcontextprotocol/server";
 import type { ChatRoomConfig } from "../config/types.js";
 import type { AppDatabase } from "../infrastructure/database/app-database.js";
+import type { PluginMcpRegistrar } from "../mcp/server/plugin-mcp-registrar.js";
 import type { OperationLog } from "../operations/operation-log.js";
 import type { RuntimeEventBus } from "../app/event-bus.js";
 import type { ExternalAccessRegistry } from "../app/external-access-registry.js";
@@ -42,6 +42,6 @@ export interface PluginContext {
 export interface InternalPlugin {
   id: string;
   activate(context: PluginContext): Promise<void> | void;
-  registerMcp?(server: McpServer): void;
+  registerMcp?(mcp: PluginMcpRegistrar): void;
   deactivate?(): Promise<void> | void;
 }
