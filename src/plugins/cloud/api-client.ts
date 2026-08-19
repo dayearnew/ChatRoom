@@ -14,12 +14,6 @@ const recoveryCredentialSchema = z
     recoveryKey: z.string().regex(/^crr\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/),
   })
   .strict();
-const registrationSchema = z
-  .object({
-    installationId: z.string().uuid(),
-    registered: z.literal(true),
-  })
-  .strict();
 const sessionSchema = z
   .object({
     purchaseToken: z.string().min(24),
@@ -43,30 +37,9 @@ const restoreSchema = z
     recoveryKey: z.string().regex(/^crr\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/),
   })
   .strict();
-const prefixSchema = z
-  .object({
-    publicPrefix: z.string().min(1),
-    mcpUrl: z.string().url(),
-    webUrl: z.string().url(),
-  })
-  .strict();
 
 export class CloudApiClient {
   constructor(private readonly baseUrl: string) {}
-
-  async registerDevice(
-    identity: DeviceIdentity,
-  ): Promise<z.infer<typeof registrationSchema>> {
-    const payload = { devicePublicKey: identity.devicePublicKey };
-    return registrationSchema.parse(
-      await this.devicePost(
-        "/v1/device/register",
-        "register",
-        identity,
-        payload,
-      ),
-    );
-  }
 
   async createManagementSession(
     identity: DeviceIdentity,
@@ -116,16 +89,6 @@ export class CloudApiClient {
         identity,
         payload,
       ),
-    );
-  }
-
-  async setPrefix(
-    identity: DeviceIdentity,
-    prefix: string,
-  ): Promise<z.infer<typeof prefixSchema>> {
-    const payload = { devicePublicKey: identity.devicePublicKey, prefix };
-    return prefixSchema.parse(
-      await this.devicePost("/v1/device/prefix", "prefix", identity, payload),
     );
   }
 

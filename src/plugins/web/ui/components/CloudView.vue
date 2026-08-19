@@ -24,16 +24,17 @@ interface CloudStatus {
   lastError: string | null;
 }
 
+type CloudService = "remote_mcp" | "remote_web";
+
 const locale = useLocale();
 const status = ref<CloudStatus | null>(null);
 const error = ref("");
+const errorVisible = ref(false);
 const recoveryKey = ref("");
 const restoring = ref(false);
 const refreshing = ref(false);
-const prefix = ref("");
-const prefixSaving = ref(false);
-const registering = ref(false);
-const registrationComplete = ref(false);
+const confirmationService = ref<CloudService | null>(null);
+const serviceUpdating = ref<CloudService | null>(null);
 
 const subscribed = computed(() => {
   const services = new Set(
@@ -51,14 +52,6 @@ const subscriptionExpiry = computed(() => {
   return values.length ? Math.min(...values) : null;
 });
 
-const normalizedPrefix = computed(() => prefix.value.trim().toLowerCase());
-const canSavePrefix = computed(
-  () =>
-    Boolean(normalizedPrefix.value) &&
-    normalizedPrefix.value !== status.value?.publicPrefix &&
-    !prefixSaving.value,
-);
-
 const subscriptionDescription = computed(() => {
   if (!subscribed.value)
     return locale.t("$vuetify.chatroom.cloud.inactiveDescription");
@@ -70,114 +63,94 @@ const subscriptionDescription = computed(() => {
   ).format(new Date(subscriptionExpiry.value))}`;
 });
 
+const confirmationTitle = computed(() =>
+  confirmationService.value === "remote_web"
+    ? locale.t("$vuetify.chatroom.cloud.disableWebTitle")
+    : locale.t("$vuetify.chatroom.cloud.disableMcpTitle"),
+);
+
+const confirmationDescription = computed(() =>
+  confirmationService.value === "remote_web"
+    ? locale.t("$vuetify.chatroom.cloud.disableWebDescription")
+    : locale.t("$vuetify.chatroom.cloud.disableMcpDescription"),
+);
+
 onMounted(load);
 
-function applyStatus(next: CloudStatus, preservePrefixInput = false) {
-  const previousPrefix = status.value?.publicPrefix ?? null;
-  const inputMatchesPrevious =
-    normalizedPrefix.value === (previousPrefix ?? "");
+function applyStatus(next: CloudStatus) {
   status.value = next;
-  if (!preservePrefixInput || inputMatchesPrevious)
-    prefix.value = next.publicPrefix ?? "";
+}
+
+function showError(value: unknown) {
+  error.value = value instanceof Error ? value.message : String(value);
+  errorVisible.value = true;
 }
 
 async function load() {
-  error.value = "";
   try {
     applyStatus(await api<CloudStatus>("/cloud/status"));
   } catch (value) {
-    error.value = (value as Error).message;
-  }
-}
-
-async function registerDevice() {
-  registering.value = true;
-  registrationComplete.value = false;
-  error.value = "";
-  try {
-    applyStatus(
-      await api<CloudStatus>("/cloud/register", { method: "POST" }),
-      true,
-    );
-    registrationComplete.value = true;
-  } catch (value) {
-    error.value = (value as Error).message;
-  } finally {
-    registering.value = false;
+    showError(value);
   }
 }
 
 async function refresh() {
   refreshing.value = true;
-  error.value = "";
   try {
-    applyStatus(
-      await api<CloudStatus>("/cloud/sync", { method: "POST" }),
-      true,
-    );
+    applyStatus(await api<CloudStatus>("/cloud/sync", { method: "POST" }));
   } catch (value) {
-    error.value = (value as Error).message;
+    showError(value);
   } finally {
     refreshing.value = false;
   }
 }
 
 async function manage() {
-  error.value = "";
   try {
     const result = await api<{ url: string }>("/cloud/management", {
       method: "POST",
     });
     window.open(result.url, "_blank", "noopener,noreferrer");
   } catch (value) {
-    error.value = (value as Error).message;
+    showError(value);
   }
 }
 
-async function savePrefix() {
-  if (!canSavePrefix.value) return;
-  prefixSaving.value = true;
-  error.value = "";
-  try {
-    applyStatus(
-      await api<CloudStatus>("/cloud/prefix", {
-        method: "POST",
-        body: JSON.stringify({ prefix: normalizedPrefix.value }),
-      }),
-    );
-  } catch (value) {
-    error.value = (value as Error).message;
-  } finally {
-    prefixSaving.value = false;
+function requestServiceChange(service: CloudService, enabled: boolean) {
+  if (enabled) {
+    void setService(service, true);
+    return;
   }
+  confirmationService.value = service;
 }
 
-async function setService(
-  service: "remote_mcp" | "remote_web",
-  enabled: boolean,
-) {
-  if (!status.value) return;
-  const previous = status.value.desiredServices[service];
-  status.value.desiredServices[service] = enabled;
-  error.value = "";
+async function confirmDisableService() {
+  const service = confirmationService.value;
+  if (!service) return;
+  await setService(service, false);
+  if (serviceUpdating.value === null) confirmationService.value = null;
+}
+
+async function setService(service: CloudService, enabled: boolean) {
+  if (!status.value || serviceUpdating.value) return;
+  serviceUpdating.value = service;
   try {
     applyStatus(
       await api<CloudStatus>(`/cloud/services/${service}`, {
         method: "POST",
         body: JSON.stringify({ enabled }),
       }),
-      true,
     );
   } catch (value) {
-    status.value.desiredServices[service] = previous;
-    error.value = (value as Error).message;
+    showError(value);
+  } finally {
+    serviceUpdating.value = null;
   }
 }
 
 async function restore() {
   if (!recoveryKey.value.trim()) return;
   restoring.value = true;
-  error.value = "";
   try {
     const result = await api<{ status: CloudStatus }>("/cloud/restore", {
       method: "POST",
@@ -186,7 +159,7 @@ async function restore() {
     applyStatus(result.status);
     recoveryKey.value = "";
   } catch (value) {
-    error.value = (value as Error).message;
+    showError(value);
   } finally {
     restoring.value = false;
   }
@@ -196,8 +169,6 @@ async function restore() {
 <template>
   <div class="cloud-view">
     <v-card class="panel-card cloud-panel">
-      <div v-if="error" class="cloud-error-text">{{ error }}</div>
-
       <template v-if="status && subscribed">
         <div class="cloud-row">
           <div class="cloud-row-main">
@@ -225,36 +196,6 @@ async function restore() {
         </div>
         <v-divider />
 
-        <div class="cloud-prefix-row">
-          <div class="cloud-prefix-copy">
-            <div class="cloud-row-title">
-              {{ locale.t("$vuetify.chatroom.cloud.publicPrefix") }}
-            </div>
-            <div class="cloud-row-value">
-              {{ locale.t("$vuetify.chatroom.cloud.prefixHint") }}
-            </div>
-          </div>
-          <v-text-field
-            v-model="prefix"
-            placeholder="my-chatroom"
-            density="compact"
-            variant="outlined"
-            hide-details
-            autocomplete="off"
-            @keyup.enter="savePrefix"
-          />
-          <v-btn
-            variant="tonal"
-            size="small"
-            :loading="prefixSaving"
-            :disabled="!canSavePrefix"
-            @click="savePrefix"
-          >
-            {{ locale.t("$vuetify.chatroom.cloud.savePrefix") }}
-          </v-btn>
-        </div>
-        <v-divider />
-
         <div class="cloud-row">
           <div class="cloud-row-main">
             <div class="cloud-row-title">
@@ -269,9 +210,13 @@ async function restore() {
           </div>
           <v-switch
             :model-value="status.desiredServices.remote_mcp"
+            :loading="serviceUpdating === 'remote_mcp'"
+            :disabled="serviceUpdating !== null"
             hide-details
             density="compact"
-            @update:model-value="setService('remote_mcp', Boolean($event))"
+            @update:model-value="
+              requestServiceChange('remote_mcp', Boolean($event))
+            "
           />
         </div>
         <v-divider />
@@ -289,9 +234,13 @@ async function restore() {
           </div>
           <v-switch
             :model-value="status.desiredServices.remote_web"
+            :loading="serviceUpdating === 'remote_web'"
+            :disabled="serviceUpdating !== null"
             hide-details
             density="compact"
-            @update:model-value="setService('remote_web', Boolean($event))"
+            @update:model-value="
+              requestServiceChange('remote_web', Boolean($event))
+            "
           />
         </div>
       </template>
@@ -347,27 +296,51 @@ async function restore() {
               {{ status.installationId }}
             </div>
           </div>
-          <div class="cloud-row-actions">
-            <v-chip
-              v-if="registrationComplete"
-              color="success"
-              size="small"
-              variant="tonal"
-            >
-              {{ locale.t("$vuetify.chatroom.cloud.registered") }}
-            </v-chip>
-            <v-btn
-              color="primary"
-              variant="tonal"
-              size="small"
-              :loading="registering"
-              @click="registerDevice"
-            >
-              {{ locale.t("$vuetify.chatroom.cloud.registerDevice") }}
-            </v-btn>
-          </div>
         </div>
       </template>
     </v-card>
   </div>
+
+  <v-dialog
+    :model-value="confirmationService !== null"
+    max-width="480"
+    @update:model-value="!$event && (confirmationService = null)"
+  >
+    <v-card>
+      <v-card-title>{{ confirmationTitle }}</v-card-title>
+      <v-card-text>{{ confirmationDescription }}</v-card-text>
+      <v-card-actions>
+        <v-spacer />
+        <v-btn
+          variant="text"
+          :disabled="serviceUpdating !== null"
+          @click="confirmationService = null"
+        >
+          {{ locale.t("$vuetify.chatroom.common.cancel") }}
+        </v-btn>
+        <v-btn
+          color="error"
+          variant="flat"
+          :loading="serviceUpdating === confirmationService"
+          @click="confirmDisableService"
+        >
+          {{ locale.t("$vuetify.chatroom.cloud.disableConfirm") }}
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-snackbar
+    v-model="errorVisible"
+    color="error"
+    location="top"
+    :timeout="6000"
+  >
+    {{ error }}
+    <template #actions>
+      <v-btn variant="text" @click="errorVisible = false">
+        {{ locale.t("$vuetify.chatroom.common.close") }}
+      </v-btn>
+    </template>
+  </v-snackbar>
 </template>

@@ -89,12 +89,6 @@ export class CloudController {
     if (this.state.lease) this.connection = "disconnected";
   }
 
-  async registerDevice(): Promise<CloudStatus> {
-    await this.api.registerDevice(this.identity());
-    this.lastError = null;
-    return this.status();
-  }
-
   async managementUrl(): Promise<{ url: string; expiresAt: string }> {
     const current = this.state.managementSession;
     if (current && Date.parse(current.expiresAt) > Date.now()) {
@@ -181,19 +175,6 @@ export class CloudController {
   async replaceRecoveryKey(): Promise<string> {
     const result = await this.api.replaceRecoveryKey(this.identity());
     return result.recoveryKey;
-  }
-
-  async setPrefix(prefix: string): Promise<CloudStatus> {
-    const result = await this.api.setPrefix(this.identity(), prefix);
-    this.state = { ...this.state, publicPrefix: result.publicPrefix };
-    await this.store.save(this.state);
-    if (!this.stopped && this.state.entitlements.length > 0) {
-      await this.refreshLeaseIfNeeded(true);
-      this.connectTunnel();
-      this.scheduleRenewal();
-    }
-    this.lastError = null;
-    return this.status();
   }
 
   async setService(
