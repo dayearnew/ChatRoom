@@ -88,16 +88,24 @@ export class CloudTunnelClient {
   }
 
   updateLease(lease: CloudLeaseState): void {
-    const previousServices = this.lease.services;
-    const reconnect =
-      lease.token !== this.lease.token ||
-      lease.tunnelUrl !== this.lease.tunnelUrl;
-    const removesService = previousServices.some(
+    const tunnelChanged = lease.tunnelUrl !== this.lease.tunnelUrl;
+    const removesService = this.lease.services.some(
       (service) => !lease.services.includes(service),
     );
     this.lease = lease;
     this.acceptingServices = new Set(lease.services);
-    if (!reconnect || this.stopped) return;
+    if (this.stopped) return;
+
+    // A new signed lease on the same tunnel is applied in-band. This keeps the
+    // current WebUI/API request alive while service permissions change.
+    if (!tunnelChanged) {
+      if (this.socket?.readyState === WebSocket.OPEN)
+        this.send({ type: "update-lease", lease: lease.token });
+      return;
+    }
+
+    // Changing the tunnel endpoint still requires a reconnect. If a service is
+    // being removed, let current streams finish before moving the connection.
     if (!removesService || this.streams.size === 0) {
       this.socket?.close();
       return;

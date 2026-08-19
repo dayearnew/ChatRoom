@@ -13,17 +13,6 @@ export function createCloudApiRouter(
   router.get("/cloud/status", (_req, res) => res.json(controller.status()));
 
   router.post(
-    "/cloud/register",
-    asyncRoute(async (_req, res) =>
-      res.json(
-        await operations.run(
-          { pluginId: "cloud", source: "gui", action: "register" },
-          () => controller.registerDevice(),
-        ),
-      ),
-    ),
-  );
-  router.post(
     "/cloud/sync",
     asyncRoute(async (_req, res) =>
       res.json(
@@ -70,26 +59,6 @@ export function createCloudApiRouter(
         ),
       ),
     ),
-  );
-  router.post(
-    "/cloud/prefix",
-    asyncRoute(async (req, res) => {
-      const body = z
-        .object({ prefix: z.string().min(1).max(64) })
-        .strict()
-        .parse(req.body);
-      res.json(
-        await operations.run(
-          {
-            pluginId: "cloud",
-            source: "gui",
-            action: "prefix.set",
-            input: body,
-          },
-          () => controller.setPrefix(body.prefix),
-        ),
-      );
-    }),
   );
   router.post(
     "/cloud/services/:service",

@@ -349,30 +349,12 @@ body {
   gap: 4px;
 }
 
-.cloud-prefix-row {
-  display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(220px, 320px) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 18px;
-}
-
-.cloud-prefix-copy {
-  min-width: 0;
-}
-
 .cloud-restore-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   padding: 12px 18px;
-}
-
-.cloud-error-text {
-  margin-bottom: 8px;
-  color: rgb(var(--v-theme-error));
-  font-size: 12px;
 }
 
 .cloud-loading {
@@ -1430,15 +1412,6 @@ body {
   .metric-grid {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-  }
-
-  .cloud-prefix-row {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-  }
-
-  .cloud-prefix-row .v-btn {
-    justify-self: end;
   }
 
   .cloud-row-actions {

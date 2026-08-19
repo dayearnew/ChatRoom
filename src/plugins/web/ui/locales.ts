@@ -21,16 +21,18 @@ const enChatRoom = {
     subscription: "Subscription",
     active: "Active",
     expires: "Expires",
-    publicPrefix: "Public prefix",
-    prefixHint: "3-32 lowercase letters, numbers, or hyphens.",
-    savePrefix: "Save",
     installationId: "Installation ID",
-    registerDevice: "Register device",
-    registered: "Registered",
     remoteMcp: "Remote MCP",
     remoteMcpDescription: "Expose MCP through ChatRoom Cloud.",
     remoteWeb: "Remote WebUI",
     remoteWebDescription: "Expose the ChatRoom WebUI through ChatRoom Cloud.",
+    disableMcpTitle: "Disable remote MCP?",
+    disableMcpDescription:
+      "Remote MCP access will stop until you enable it again from this page.",
+    disableWebTitle: "Disable remote WebUI?",
+    disableWebDescription:
+      "The current remote WebUI address will stop working immediately. You will not be able to use that address to return here and re-enable remote access; use the local WebUI instead.",
+    disableConfirm: "Disable",
     connection: {
       inactive: "Inactive",
       connecting: "Connecting",
@@ -51,6 +53,7 @@ const enChatRoom = {
     language: "Language",
     theme: "Theme",
     cancel: "Cancel",
+    close: "Close",
   },
   theme: { system: "Follow system", light: "Light", dark: "Dark" },
   auth: {
@@ -205,8 +208,6 @@ const enChatRoom = {
     manageCloud: "Open Cloud management",
     restoreCloud: "Restore Cloud subscription",
     replaceRecoveryKey: "Replace recovery key",
-    setCloudPrefix: "Set Cloud prefix",
-    registerCloudDevice: "Register Cloud device",
     setCloudService: "Set Cloud service",
   },
 };
@@ -230,16 +231,18 @@ const zhChatRoom: typeof enChatRoom = {
     subscription: "订阅状态",
     active: "已生效",
     expires: "到期时间",
-    publicPrefix: "公网前缀",
-    prefixHint: "3-32 位小写字母、数字或连字符。",
-    savePrefix: "保存",
     installationId: "安装 ID",
-    registerDevice: "注册设备",
-    registered: "已注册",
     remoteMcp: "远程 MCP",
     remoteMcpDescription: "通过 ChatRoom Cloud 暴露 MCP。",
     remoteWeb: "远程 WebUI",
     remoteWebDescription: "通过 ChatRoom Cloud 暴露 ChatRoom WebUI。",
+    disableMcpTitle: "关闭远程 MCP？",
+    disableMcpDescription:
+      "关闭后将停止远程 MCP 访问，重新开启后才能继续使用。",
+    disableWebTitle: "关闭远程 WebUI？",
+    disableWebDescription:
+      "关闭后，当前远程 WebUI 地址将立即无法访问，也无法再通过该地址返回此页面重新开启。请通过本地 WebUI 重新开启远程访问。",
+    disableConfirm: "关闭",
     connection: {
       inactive: "未启用",
       connecting: "连接中",
@@ -260,6 +263,7 @@ const zhChatRoom: typeof enChatRoom = {
     language: "语言",
     theme: "主题",
     cancel: "取消",
+    close: "关闭",
   },
   theme: { system: "跟随系统", light: "浅色", dark: "深色" },
   auth: {
@@ -413,8 +417,6 @@ const zhChatRoom: typeof enChatRoom = {
     manageCloud: "打开 Cloud 管理页面",
     restoreCloud: "恢复 Cloud 订阅",
     replaceRecoveryKey: "更换恢复密钥",
-    setCloudPrefix: "设置 Cloud 前缀",
-    registerCloudDevice: "注册 Cloud 设备",
     setCloudService: "设置 Cloud 服务",
   },
 };
@@ -442,8 +444,6 @@ const actionKeys: Record<string, string> = {
   management: "manageCloud",
   restore: "restoreCloud",
   "recovery-key.replace": "replaceRecoveryKey",
-  "prefix.set": "setCloudPrefix",
-  register: "registerCloudDevice",
   "service.set": "setCloudService",
 };
 
