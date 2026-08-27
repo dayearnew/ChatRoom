@@ -10,6 +10,13 @@ import {
 const PROTOCOL = "chatroom-tunnel-v1";
 const HIGH_WATER = 8 * 1024 * 1024;
 const LOW_WATER = 2 * 1024 * 1024;
+const READY_TIMEOUT_MS = 10_000;
+const HEARTBEAT_INTERVAL_MS = 20_000;
+
+interface TunnelTimings {
+  readyTimeoutMs: number;
+  heartbeatIntervalMs: number;
+}
 
 interface StreamState {
   request: ClientRequest;
@@ -35,11 +42,15 @@ type ControlMessage =
 export class CloudTunnelClient {
   private socket: WebSocket | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private readyTimer: NodeJS.Timeout | null = null;
+  private heartbeatTimer: NodeJS.Timeout | null = null;
+  private awaitingPong = false;
   private stopped = true;
   private attempts = 0;
   private closeWhenIdle: "stop" | "reconnect" | null = null;
   private acceptingServices: Set<CloudLeaseState["services"][number]>;
   private readonly streams = new Map<number, StreamState>();
+  private readonly timings: TunnelTimings;
 
   constructor(
     private lease: CloudLeaseState,
@@ -50,8 +61,13 @@ export class CloudTunnelClient {
       onDisconnected(): void;
       onError(error: Error): void;
     },
+    timings: Partial<TunnelTimings> = {},
   ) {
     this.acceptingServices = new Set(lease.services);
+    this.timings = {
+      readyTimeoutMs: timings.readyTimeoutMs ?? READY_TIMEOUT_MS,
+      heartbeatIntervalMs: timings.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS,
+    };
   }
 
   start(): void {
@@ -68,6 +84,7 @@ export class CloudTunnelClient {
     this.acceptingServices.clear();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    this.clearSocketTimers();
     this.socket?.close();
     this.socket = null;
     for (const stream of this.streams.values()) stream.request.destroy();
@@ -79,6 +96,7 @@ export class CloudTunnelClient {
     this.acceptingServices.clear();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    this.clearSocketTimers();
     if (this.streams.size === 0) {
       this.closeWhenIdle = null;
       this.socket?.close();
@@ -118,6 +136,7 @@ export class CloudTunnelClient {
     const socket = new WebSocket(this.lease.tunnelUrl, PROTOCOL);
     this.socket = socket;
     socket.binaryType = "nodebuffer";
+    this.startReadyTimeout(socket);
     socket.on("message", (data, isBinary) => {
       try {
         if (isBinary) this.handleBinary(Buffer.from(data as Buffer));
@@ -129,15 +148,21 @@ export class CloudTunnelClient {
         socket.close();
       }
     });
+    socket.on("pong", () => {
+      if (this.socket === socket) this.awaitingPong = false;
+    });
     socket.on("close", () => {
-      if (this.socket === socket) this.socket = null;
+      if (this.socket === socket) {
+        this.clearSocketTimers();
+        this.socket = null;
+      }
       this.closeWhenIdle = null;
       for (const stream of this.streams.values()) stream.request.destroy();
       this.streams.clear();
       this.callbacks.onDisconnected();
       if (!this.stopped) this.scheduleReconnect();
     });
-    socket.on("error", (error) => this.callbacks.onError(error));
+    socket.on("error", (error) => this.failSocket(socket, error));
   }
 
   private handleControl(message: ControlMessage): void {
@@ -155,6 +180,8 @@ export class CloudTunnelClient {
     }
     if (message.type === "ready") {
       this.attempts = 0;
+      this.clearReadyTimeout();
+      if (this.socket) this.startHeartbeat(this.socket);
       this.callbacks.onConnected();
       return;
     }
@@ -282,6 +309,51 @@ export class CloudTunnelClient {
     chunk.copy(frame, 4);
     socket.send(frame, { binary: true });
     return socket.bufferedAmount < HIGH_WATER;
+  }
+
+  private startReadyTimeout(socket: WebSocket): void {
+    this.clearReadyTimeout();
+    this.readyTimer = setTimeout(() => {
+      this.readyTimer = null;
+      this.failSocket(socket, new Error("Tunnel connection timed out"));
+    }, this.timings.readyTimeoutMs);
+    this.readyTimer.unref();
+  }
+
+  private clearReadyTimeout(): void {
+    if (this.readyTimer) clearTimeout(this.readyTimer);
+    this.readyTimer = null;
+  }
+
+  private startHeartbeat(socket: WebSocket): void {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.awaitingPong = false;
+    this.heartbeatTimer = setInterval(() => {
+      if (this.socket !== socket || socket.readyState !== WebSocket.OPEN)
+        return;
+      if (this.awaitingPong) {
+        this.failSocket(socket, new Error("Tunnel heartbeat timed out"));
+        return;
+      }
+      this.awaitingPong = true;
+      socket.ping();
+    }, this.timings.heartbeatIntervalMs);
+    this.heartbeatTimer.unref();
+  }
+
+  private clearSocketTimers(): void {
+    this.clearReadyTimeout();
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
+    this.awaitingPong = false;
+  }
+
+  private failSocket(socket: WebSocket, error: Error): void {
+    if (this.socket !== socket) return;
+    this.callbacks.onError(error);
+    this.clearSocketTimers();
+    this.socket = null;
+    socket.terminate();
   }
 
   private scheduleReconnect(): void {
