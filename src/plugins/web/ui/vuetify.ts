@@ -51,6 +51,13 @@ export const vuetify = createVuetify({
       hideDetails: "auto",
     },
     VSelect: { variant: "outlined", density: "compact", hideDetails: "auto" },
+    VSwitch: {
+      color: "primary",
+      density: "compact",
+      hideDetails: true,
+      inset: true,
+      size: "small",
+    },
     VChip: { size: "small", variant: "tonal" },
     VTabs: { color: "primary" },
   },

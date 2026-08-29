@@ -212,8 +212,6 @@ async function restore() {
             :model-value="status.desiredServices.remote_mcp"
             :loading="serviceUpdating === 'remote_mcp'"
             :disabled="serviceUpdating !== null"
-            hide-details
-            density="compact"
             @update:model-value="
               requestServiceChange('remote_mcp', Boolean($event))
             "
@@ -236,8 +234,6 @@ async function restore() {
             :model-value="status.desiredServices.remote_web"
             :loading="serviceUpdating === 'remote_web'"
             :disabled="serviceUpdating !== null"
-            hide-details
-            density="compact"
             @update:model-value="
               requestServiceChange('remote_web', Boolean($event))
             "

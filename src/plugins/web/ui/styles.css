@@ -6,6 +6,62 @@ body {
   margin: 0;
 }
 
+.v-switch {
+  --chatroom-switch-track-off: rgb(var(--v-theme-on-surface), 0.14);
+  --chatroom-switch-track-on: rgb(var(--v-theme-primary), 0.34);
+  --chatroom-switch-border-off: rgb(var(--v-theme-outline), 0.3);
+  --chatroom-switch-border-on: rgb(var(--v-theme-primary), 0.62);
+  --chatroom-switch-thumb-off: rgb(var(--v-theme-surface));
+}
+
+.v-theme--dark .v-switch {
+  --chatroom-switch-track-off: rgb(var(--v-theme-on-surface), 0.2);
+  --chatroom-switch-track-on: rgb(var(--v-theme-primary), 0.42);
+  --chatroom-switch-border-off: rgb(var(--v-theme-on-surface), 0.26);
+  --chatroom-switch-border-on: rgb(var(--v-theme-primary), 0.72);
+  --chatroom-switch-thumb-off: rgb(var(--v-theme-on-surface), 0.78);
+}
+
+.v-switch .v-selection-control {
+  opacity: 1;
+}
+
+.v-switch .v-switch__track {
+  opacity: 1;
+  border: 1px solid var(--chatroom-switch-border-off);
+  background: var(--chatroom-switch-track-off);
+}
+
+.v-switch .v-switch__thumb {
+  background: var(--chatroom-switch-thumb-off);
+  color: rgb(var(--v-theme-on-surface));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.v-switch .v-selection-control--dirty .v-switch__track {
+  border-color: var(--chatroom-switch-border-on);
+  background: var(--chatroom-switch-track-on);
+}
+
+.v-switch .v-selection-control--dirty .v-switch__thumb {
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+}
+
+.v-switch .v-selection-control--focus-visible .v-switch__track {
+  outline: 2px solid rgb(var(--v-theme-primary), 0.58);
+  outline-offset: 2px;
+}
+
+.v-switch.v-input--disabled .v-selection-control {
+  opacity: 0.46;
+}
+
+.v-switch.v-switch--loading .v-selection-control {
+  opacity: 0.72;
+}
+
 .app-shell {
   background: rgb(var(--v-theme-background));
 }

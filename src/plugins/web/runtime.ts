@@ -2,6 +2,7 @@ import type { OperationLog } from "../../operations/operation-log.js";
 import type { WorkspaceService } from "../workspace/workspace-service.js";
 import type { ProcessSupervisor } from "../process/process-supervisor.js";
 import type { GitService } from "../workspace/git/git-service.js";
+import type { ComputerService } from "../computer/computer-service.js";
 
 export class WebRuntime {
   constructor(
@@ -9,6 +10,7 @@ export class WebRuntime {
     readonly operations: OperationLog,
     readonly processes: ProcessSupervisor,
     readonly git: GitService,
+    readonly computer: ComputerService,
   ) {}
 
   previewWorktreeApply(workspaceId: string) {

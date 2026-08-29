@@ -18,6 +18,10 @@ import {
   ProcessService,
 } from "../plugins/process/plugin.js";
 import { createCloudPlugin, CloudService } from "../plugins/cloud/plugin.js";
+import {
+  createComputerPlugin,
+  ComputerServiceToken,
+} from "../plugins/computer/plugin.js";
 import { createWebPlugin, WebServiceToken } from "../plugins/web/plugin.js";
 import { createChatRoomMcpHandler } from "../mcp/server/create-mcp-server.js";
 import { HttpServer } from "../infrastructure/http/http-server.js";
@@ -30,6 +34,7 @@ export interface ApplicationComponents {
   application: import("../plugins/web/runtime.js").WebRuntime;
   processes: import("../plugins/process/process-supervisor.js").ProcessSupervisor;
   cloud: import("../plugins/cloud/controller.js").CloudController;
+  computer: import("../plugins/computer/computer-service.js").ComputerService;
   http: HttpServer;
 }
 
@@ -65,6 +70,7 @@ export async function createApplication(
       [
         createWorkspacePlugin(),
         createProcessPlugin(),
+        createComputerPlugin(),
         createCloudPlugin(),
         createWebPlugin(),
       ],
@@ -73,6 +79,7 @@ export async function createApplication(
     const web = services.require(WebServiceToken);
     const processes = services.require(ProcessService);
     const cloud = services.require(CloudService);
+    const computer = services.require(ComputerServiceToken);
     const mcp = createChatRoomMcpHandler(plugins);
     const http = new HttpServer(
       config,
@@ -92,6 +99,7 @@ export async function createApplication(
       application: web.application,
       processes,
       cloud,
+      computer,
       http,
     };
   } catch (error) {

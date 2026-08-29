@@ -19,6 +19,7 @@ import { createWorkspaceApiRouter } from "./workspace-api-router.js";
 import type { IngressPolicy } from "../../../auth/ingress-policy.js";
 import type { CloudController } from "../../cloud/controller.js";
 import { createCloudApiRouter } from "./cloud-api-router.js";
+import { createComputerApiRouter } from "./computer-api-router.js";
 
 const SESSION_COOKIE = "chatroom_session";
 
@@ -163,6 +164,13 @@ export function createApiRouter(
   });
   router.use(createWorkspaceApiRouter(application));
   router.use(createProcessApiRouter(application));
+  router.use(
+    createComputerApiRouter(
+      application.computer,
+      application.operations,
+      ingress,
+    ),
+  );
   router.use(createCloudApiRouter(cloud, application.operations));
   router.get("/events", (req, res) => {
     res.status(200);

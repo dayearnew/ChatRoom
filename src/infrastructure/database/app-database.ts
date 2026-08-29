@@ -90,6 +90,13 @@ const SCHEMA = `
   );
   CREATE INDEX IF NOT EXISTS passkeys_last_used_idx ON passkeys(last_used_at DESC);
 
+  CREATE TABLE IF NOT EXISTS computer_settings (
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    enabled INTEGER NOT NULL DEFAULT 0,
+    remote_access INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL
+  );
+
 `;
 
 export class AppDatabase {

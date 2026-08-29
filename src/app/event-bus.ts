@@ -2,11 +2,13 @@
 import { EventEmitter } from "node:events";
 import type { Operation } from "../core/operations/types.js";
 import type { ProcessSnapshot } from "../plugins/process/types.js";
+import type { ComputerSettings } from "../plugins/computer/types.js";
 
 export type RuntimeEvent =
   | { type: "operation"; operation: Operation }
   | { type: "operations-cleared"; deleted: number; preserved: number }
   | { type: "process"; process: ProcessSnapshot }
+  | { type: "computer-settings"; settings: ComputerSettings }
   | {
       type: "process-output";
       processId: string;

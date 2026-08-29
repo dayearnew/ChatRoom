@@ -9,7 +9,112 @@ permissions:
   id-token: write
 
 jobs:
+  native-macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.15.0"
+          package-manager-cache: false
+      - name: Configure macOS signing keychain
+        env:
+          MACOS_SIGNING_P12: ${{ secrets.MACOS_SIGNING_P12 }}
+          MACOS_SIGNING_P12_PASSWORD: ${{ secrets.MACOS_SIGNING_P12_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          P12_PATH="$RUNNER_TEMP/chatroom-signing.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/chatroom-signing.keychain-db"
+
+          umask 077
+          printf '%s' "$MACOS_SIGNING_P12" | /usr/bin/base64 -D > "$P12_PATH"
+          /usr/bin/security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          /usr/bin/security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          /usr/bin/security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          /usr/bin/security import "$P12_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$MACOS_SIGNING_P12_PASSWORD" \
+            -T /usr/bin/codesign
+          /usr/bin/security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$MACOS_KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH" >/dev/null
+          /usr/bin/security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+          if ! /usr/bin/security find-certificate \
+            -c "ChatRoom Computer Signing" \
+            "$KEYCHAIN_PATH" >/dev/null; then
+            echo "Required macOS signing identity not found" >&2
+            exit 1
+          fi
+
+      - name: Build macOS Computer helper
+        env:
+          CHATROOM_MACOS_SIGN_IDENTITY: ChatRoom Computer Signing
+        run: npm run build:native:macos
+
+      - name: Verify macOS signature and designated requirement
+        run: |
+          set -euo pipefail
+          APP="dist/native/macos/ChatRoomComputerHelper.app"
+          BINARY="$APP/Contents/MacOS/chatroom-computer-helper"
+          EXPECTED_DR='identifier "com.chatroomcp.computer" and certificate root = H"747d8dc91a4385cbd84e6aabef15cf59c5cf6ca1"'
+
+          /usr/bin/codesign --verify --deep --strict "$APP"
+          /usr/bin/codesign --verify --deep --strict "$BINARY"
+
+          echo "macOS signing diagnostics:"
+          /usr/bin/codesign -dv --verbose=4 "$BINARY" 2>&1 \
+            | /usr/bin/grep -E '^(Identifier|Authority|TeamIdentifier)=' || true
+
+          ACTUAL_DR="$(/usr/bin/codesign -d -r- "$BINARY" 2>&1 \
+            | /usr/bin/sed -n 's/^designated => //p')"
+          if [[ "$ACTUAL_DR" != "$EXPECTED_DR" ]]; then
+            echo "Designated Requirement mismatch" >&2
+            echo "Expected: $EXPECTED_DR" >&2
+            echo "Actual:   $ACTUAL_DR" >&2
+            exit 1
+          fi
+          echo "Designated Requirement verified: $ACTUAL_DR"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: computer-native-macos
+          path: dist/native/macos
+          if-no-files-found: error
+
+      - name: Clean up macOS signing material
+        if: always()
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/chatroom-signing.keychain-db"
+          /usr/bin/security delete-keychain "$KEYCHAIN_PATH" >/dev/null 2>&1 || true
+          rm -f \
+            "$RUNNER_TEMP/chatroom-signing.p12" \
+            "$KEYCHAIN_PATH"
+
+  native-windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.15.0"
+          package-manager-cache: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check Windows Computer helper formatting
+        run: cargo fmt --manifest-path native/windows/Cargo.toml -- --check
+      - name: Build Windows Computer helper
+        run: npm run build:native:windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: computer-native-windows
+          path: dist/native/windows/chatroom-computer-helper.exe
+          if-no-files-found: error
+
   publish:
+    needs: [native-macos, native-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -18,8 +123,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '24.15.0'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: "24.15.0"
+          registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
 
       - name: Install dependencies
@@ -40,6 +145,17 @@ jobs:
 
       - name: Check
         run: npm run check
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: computer-native-macos
+          path: dist/native/macos
+      - uses: actions/download-artifact@v4
+        with:
+          name: computer-native-windows
+          path: dist/native/windows
+      - name: Make macOS helper executable
+        run: chmod 755 dist/native/macos/ChatRoomComputerHelper.app/Contents/MacOS/chatroom-computer-helper
 
       - name: Publish to npm
         run: npm publish --access public --provenance --ignore-scripts

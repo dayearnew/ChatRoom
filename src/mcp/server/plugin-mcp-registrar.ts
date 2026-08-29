@@ -3,6 +3,7 @@ import type {
   StandardSchemaWithJSON,
   ToolAnnotations,
   ToolCallback,
+  CallToolResult,
 } from "@modelcontextprotocol/server";
 import { asChatRoomError } from "../../core/errors/chatroom-error.js";
 import type { OperationLog } from "../../operations/operation-log.js";
@@ -28,6 +29,11 @@ export interface PluginToolConfig<
   outputSchema: OutputSchema;
   annotations: ToolAnnotations;
   action: PluginToolAction<PluginToolInput<InputSchema>>;
+  audit?: {
+    input?: (input: PluginToolInput<InputSchema>) => unknown;
+    output?: (output: unknown) => unknown;
+  };
+  present?: (output: unknown) => CallToolResult;
 }
 
 /** Framework-owned MCP registration boundary that guarantees every plugin tool is audited. */
@@ -49,13 +55,13 @@ export class PluginMcpRegistrar {
       execution: PluginToolExecution,
     ) => Promise<unknown> | unknown,
   ): void {
-    const { action, ...toolConfig } = config;
+    const { action, audit, present, ...toolConfig } = config;
     const callback = mcpTool<PluginToolInput<InputSchema>>(async (input) => {
       const operation = this.operations.start({
         pluginId: this.pluginId,
         source: "mcp",
         action: typeof action === "function" ? action(input) : action,
-        input,
+        input: audit?.input ? audit.input(input) : input,
         ...operationReferences(input),
       });
       let deferred = false;
@@ -68,7 +74,11 @@ export class PluginMcpRegistrar {
       try {
         const result = await handler(input, execution);
         if (!deferred)
-          this.operations.finish(operation.operationId, "success", result);
+          this.operations.finish(
+            operation.operationId,
+            "success",
+            audit?.output ? audit.output(result) : result,
+          );
         return result;
       } catch (error) {
         if (this.operations.get(operation.operationId)?.status === "running") {
@@ -81,7 +91,7 @@ export class PluginMcpRegistrar {
         }
         throw error;
       }
-    }) as ToolCallback<InputSchema>;
+    }, present) as ToolCallback<InputSchema>;
     this.server.registerTool(name, toolConfig, callback);
   }
 }

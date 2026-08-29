@@ -40,9 +40,10 @@ async function read(
   workspaceId: string,
   path: string,
 ) {
-  return (await runtime.components.application.workspaces.fs(workspaceId)).read(
-    path,
-  );
+  const result = await (
+    await runtime.components.application.workspaces.fs(workspaceId)
+  ).read(path);
+  return { ...result, content: result.content.replaceAll("\r\n", "\n") };
 }
 
 test("worktree workspace is created as an isolated managed checkout", async () => {

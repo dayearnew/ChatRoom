@@ -1,6 +1,6 @@
 {
   "name": "@chatroomcp/chatroom",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "type": "module",
   "description": "Local MCP runtime for ChatGPT with workspace, process, Cloud, and WebUI controls.",
   "bin": {
@@ -18,11 +18,14 @@
     "typecheck:web": "vue-tsc -p tsconfig.web.json --noEmit",
     "typecheck": "npm run typecheck:server && npm run typecheck:web",
     "check:architecture": "node scripts/check-architecture.mjs",
-    "test": "node --import tsx --test 'test/**/*.test.ts'",
+    "test": "node scripts/run-tests.mjs",
     "check": "npm run format:check && npm run typecheck && npm run check:architecture && npm test && npm run build",
     "start": "node dist/cli/index.js serve",
     "release": "npm publish --tag latest --access public",
-    "prepack": "npm run check"
+    "prepack": "npm run check",
+    "build:native:macos": "node scripts/build-native-macos.mjs",
+    "build:native:windows": "node scripts/build-native-windows.mjs",
+    "test:native:macos": "node --import tsx --test test/native-macos-helper.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/node": "^2.0.0",

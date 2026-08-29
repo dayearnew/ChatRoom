@@ -29,11 +29,19 @@ export class IngressPolicy {
   }
 
   requiresWebAuth(req: Request): boolean {
-    if (this.externalAccess.matches("web", req.hostname)) return true;
+    if (this.isExternalWeb(req)) return true;
     return this.config.auth.localWebAuth;
   }
 
+  isExternalWeb(req: Request): boolean {
+    return this.externalAccess.matches("web", req.hostname);
+  }
+
   requiresMcpAuth(req: Request): boolean {
+    return this.isExternalMcp(req);
+  }
+
+  isExternalMcp(req: Request): boolean {
     return this.externalAccess.matches("mcp", req.hostname);
   }
 

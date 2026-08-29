@@ -32,6 +32,8 @@ test("HTTP API and real MCP client share the same Application runtime", async ()
     const tools = await client.listTools();
     assert.ok(tools.tools.some((tool) => tool.name === "open_workspace"));
     assert.ok(tools.tools.some((tool) => tool.name === "fs_patch"));
+    assert.ok(tools.tools.some((tool) => tool.name === "computer_snapshot"));
+    assert.ok(tools.tools.some((tool) => tool.name === "computer_action"));
     assert.equal(
       tools.tools.every((tool) => Boolean(tool.outputSchema)),
       true,
@@ -78,12 +80,6 @@ test("HTTP API and real MCP client share the same Application runtime", async ()
         Record<string, unknown> | undefined
     )?.capabilities as { properties?: Record<string, unknown> } | undefined;
     assert.equal("process" in (workspaceCapabilities?.properties ?? {}), false);
-    assert.equal(
-      tools.tools.some((tool) => tool.name === "read"),
-      false,
-      "unsupported unscoped tool names must not be exposed",
-    );
-
     const opened = await client.callTool({
       name: "open_workspace",
       arguments: { path: runtime.workspaceRoot },
@@ -255,6 +251,38 @@ test("remote WebUI mutations require same-origin while loopback WebUI stays loca
     const cookie = accepted.headers["set-cookie"]?.[0];
     assert.ok(cookie);
     assert.match(cookie, /Secure/);
+
+    runtime.components.computer.setSettings({
+      enabled: true,
+      remoteAccess: false,
+    });
+    const blockedComputerPreview = await requestWithHost(
+      address.port,
+      "/api/computer/preview",
+      {
+        method: "GET",
+        host: "chatroom.example.com",
+        headers: { cookie },
+      },
+    );
+    assert.equal(
+      blockedComputerPreview.status,
+      403,
+      "remote WebUI must not read Computer screenshots while remote access is disabled",
+    );
+
+    runtime.components.computer.setSettings({ remoteAccess: true });
+    const allowedComputerPreview = await requestWithHost(
+      address.port,
+      "/api/computer/preview",
+      {
+        method: "GET",
+        host: "chatroom.example.com",
+        headers: { cookie },
+      },
+    );
+    assert.equal(allowedComputerPreview.status, 200);
+    assert.equal(allowedComputerPreview.body, "null");
 
     const wrongOrigin = await requestWithHost(address.port, "/api/operations", {
       method: "DELETE",

@@ -14,8 +14,9 @@ import PasskeyManagerDialog from "./components/PasskeyManagerDialog.vue";
 import WorkspacesView from "./components/WorkspacesView.vue";
 import ProcessesView from "./components/ProcessesView.vue";
 import CloudView from "./components/CloudView.vue";
+import ComputerView from "./components/ComputerView.vue";
 
-type View = "workspaces" | "processes" | "cloud" | "operations";
+type View = "workspaces" | "processes" | "computer" | "cloud" | "operations";
 type ThemeMode = "system" | "light" | "dark";
 type RegistrationOptionsJSON = Parameters<
   typeof startRegistration
@@ -45,6 +46,7 @@ interface RuntimeStatus {
 const nav = [
   { id: "workspaces", titleKey: "nav.workspaces", icon: "mdi-folder-outline" },
   { id: "processes", titleKey: "nav.processes", icon: "mdi-console-line" },
+  { id: "computer", titleKey: "nav.computer", icon: "mdi-monitor" },
   { id: "cloud", titleKey: "nav.cloud", icon: "mdi-cloud-outline" },
   {
     id: "operations",
@@ -86,6 +88,7 @@ const currentComponent = computed(
     ({
       workspaces: WorkspacesView,
       processes: ProcessesView,
+      computer: ComputerView,
       cloud: CloudView,
       operations: OperationsView,
     })[view.value],
@@ -199,6 +202,8 @@ function viewFromPath(): View {
   switch (window.location.pathname) {
     case "/processes":
       return "processes";
+    case "/computer":
+      return "computer";
     case "/cloud":
       return "cloud";
     case "/operations":

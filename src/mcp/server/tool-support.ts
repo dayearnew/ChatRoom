@@ -109,10 +109,12 @@ export const processSnapshotSchema = z.object({
 
 export function mcpTool<T>(
   operation: (input: T) => Promise<unknown> | unknown,
+  present?: (value: unknown) => CallToolResult,
 ): (input: T) => Promise<CallToolResult> {
   return async (input: T) => {
     try {
       const value = await operation(input);
+      if (present) return present(value);
       return {
         content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
         structuredContent: asRecord(value),

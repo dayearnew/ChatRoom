@@ -19,6 +19,7 @@ import { createOAuthRouter } from "../../presentation/http/oauth-router.js";
 import { errorMiddleware } from "../../presentation/http/http-utils.js";
 import { IngressPolicy } from "../../auth/ingress-policy.js";
 import { CHATROOM_VERSION } from "../../core/runtime/identity.js";
+import { runWithMcpAccessScope } from "../../mcp/server/request-context.js";
 
 const WEB_UI_RESERVED_PREFIXES = [
   "/api",
@@ -84,7 +85,10 @@ export class HttpServer {
       },
       mcpAuthentication(this.auth, this.ingress),
       (req, res) => {
-        void nodeMcp(req, res, req.body);
+        const scope = this.ingress.isExternalMcp(req) ? "remote" : "local";
+        runWithMcpAccessScope(scope, () => {
+          void nodeMcp(req, res, req.body);
+        });
       },
     );
 
