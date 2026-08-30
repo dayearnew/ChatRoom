@@ -1,5 +1,5 @@
 export type ComputerAccessScope = "local" | "remote";
-export type ComputerPlatform = "macos" | "windows" | "unsupported";
+export type ComputerPlatform = "macos" | "windows" | "linux" | "unsupported";
 export type ComputerHelperState = "running" | "stopped" | "unavailable";
 export type ComputerPermissionState =
   "granted" | "denied" | "unknown" | "not-required";

@@ -4,3 +4,6 @@ dist/
 coverage/
 *.log
 .DS_Store
+
+# Rust build output
+native/*/target/

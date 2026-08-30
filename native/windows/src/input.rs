@@ -12,7 +12,9 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::SetCursorPos;
 
 use crate::accessibility::Accessibility;
-use crate::models::{ActionExecution, ComputerAction, ExecutionMode, NativeError, PointValue};
+use crate::models::{
+    ActionExecution, ComputerAction, ExecutionMode, NativeError, PointValue, RectValue,
+};
 
 pub struct Input;
 
@@ -21,10 +23,12 @@ impl Input {
         &self,
         accessibility: &Accessibility,
         action: &ComputerAction,
+        capture: Option<RectValue>,
     ) -> Result<ActionExecution, NativeError> {
         match action {
             ComputerAction::Move { x, y } => {
-                move_cursor(*x, *y)?;
+                let point = snapshot_point(PointValue { x: *x, y: *y }, capture);
+                move_cursor(point.x, point.y)?;
                 foreground(false)
             }
             ComputerAction::Click { x, y, element_id } => {
@@ -33,15 +37,27 @@ impl Input {
                         return semantic(false);
                     }
                 }
-                click(target(accessibility, *element_id, *x, *y)?, false, 1)?;
+                click(
+                    target(accessibility, *element_id, *x, *y, capture)?,
+                    false,
+                    1,
+                )?;
                 foreground(true)
             }
             ComputerAction::DoubleClick { x, y, element_id } => {
-                click(target(accessibility, *element_id, *x, *y)?, false, 2)?;
+                click(
+                    target(accessibility, *element_id, *x, *y, capture)?,
+                    false,
+                    2,
+                )?;
                 foreground(true)
             }
             ComputerAction::RightClick { x, y, element_id } => {
-                click(target(accessibility, *element_id, *x, *y)?, true, 1)?;
+                click(
+                    target(accessibility, *element_id, *x, *y, capture)?,
+                    true,
+                    1,
+                )?;
                 foreground(true)
             }
             ComputerAction::Drag {
@@ -49,7 +65,11 @@ impl Input {
                 to,
                 duration_ms,
             } => {
-                drag(*from, *to, duration_ms.unwrap_or(0).min(10_000))?;
+                drag(
+                    snapshot_point(*from, capture),
+                    snapshot_point(*to, capture),
+                    duration_ms.unwrap_or(0).min(10_000),
+                )?;
                 foreground(true)
             }
             ComputerAction::Scroll {
@@ -106,7 +126,8 @@ impl Input {
                 semantic(true)
             }
             ComputerAction::MoveWindow { element_id, x, y } => {
-                accessibility.move_window(*element_id, *x, *y)?;
+                let point = snapshot_point(PointValue { x: *x, y: *y }, capture);
+                accessibility.move_window(*element_id, point.x, point.y)?;
                 semantic(false)
             }
             ComputerAction::ResizeWindow {
@@ -147,6 +168,7 @@ fn target(
     element_id: Option<i32>,
     x: Option<f64>,
     y: Option<f64>,
+    capture: Option<RectValue>,
 ) -> Result<PointValue, NativeError> {
     if let Some(id) = element_id {
         let rect = accessibility.rect(id)?;
@@ -156,10 +178,20 @@ fn target(
         });
     }
     match (x, y) {
-        (Some(x), Some(y)) => Ok(PointValue { x, y }),
+        (Some(x), Some(y)) => Ok(snapshot_point(PointValue { x, y }, capture)),
         _ => Err(NativeError::invalid(
             "Mouse action requires elementId or x/y coordinates",
         )),
+    }
+}
+
+fn snapshot_point(point: PointValue, capture: Option<RectValue>) -> PointValue {
+    match capture {
+        Some(capture) => PointValue {
+            x: point.x + capture.x as f64,
+            y: point.y + capture.y as f64,
+        },
+        None => point,
     }
 }
 

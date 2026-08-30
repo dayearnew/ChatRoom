@@ -82,7 +82,10 @@ function displaySubtitle(display: ComputerStatus["displays"][number]): string {
               {{ permissionLabel(status.permissions.accessibility) }}
             </strong>
             <v-btn
-              v-if="status.permissions.accessibility !== 'granted'"
+              v-if="
+                status.platform === 'macos' &&
+                status.permissions.accessibility !== 'granted'
+              "
               class="computer-permission-btn"
               color="primary"
               size="small"
@@ -107,7 +110,10 @@ function displaySubtitle(display: ComputerStatus["displays"][number]): string {
               {{ permissionLabel(status.permissions.screenRecording) }}
             </strong>
             <v-btn
-              v-if="status.permissions.screenRecording !== 'granted'"
+              v-if="
+                status.platform === 'macos' &&
+                status.permissions.screenRecording !== 'granted'
+              "
               class="computer-permission-btn"
               color="primary"
               size="small"

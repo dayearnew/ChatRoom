@@ -36,6 +36,7 @@ const enChatRoom = {
     platformStates: {
       macos: "macOS",
       windows: "Windows",
+      linux: "Linux X11",
       unsupported: "Unsupported",
     },
     helperStates: {
@@ -308,6 +309,7 @@ const zhChatRoom: typeof enChatRoom = {
     platformStates: {
       macos: "macOS",
       windows: "Windows",
+      linux: "Linux X11",
       unsupported: "不支持",
     },
     helperStates: {

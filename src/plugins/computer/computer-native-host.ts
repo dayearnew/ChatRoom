@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import {
+  spawn,
+  spawnSync,
+  type ChildProcessWithoutNullStreams,
+} from "node:child_process";
 import { chmodSync, existsSync, rmSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import { createInterface, type Interface } from "node:readline";
@@ -33,6 +37,7 @@ export class ComputerNativeHost {
   get platform(): ComputerPlatform {
     if (process.platform === "darwin") return "macos";
     if (process.platform === "win32") return "windows";
+    if (process.platform === "linux") return "linux";
     return "unsupported";
   }
 
@@ -81,26 +86,43 @@ export class ComputerNativeHost {
   }
 
   private async ensureStarted(): Promise<void> {
-    if (this.platform === "macos" && this.socket && !this.socket.destroyed)
+    const platform = this.platform;
+    if (platform === "macos" && this.socket && !this.socket.destroyed) return;
+    if (
+      (platform === "windows" || platform === "linux") &&
+      this.child &&
+      !this.child.killed
+    )
       return;
-    if (this.platform === "windows" && this.child && !this.child.killed) return;
     if (this.starting) return this.starting;
 
-    this.starting =
-      this.platform === "macos"
-        ? this.startMacHelper()
-        : this.platform === "windows"
-          ? this.startWindowsHelper()
-          : Promise.reject(
-              new ChatRoomError(
-                "UNSUPPORTED",
-                "Computer Use is supported only on macOS and Windows",
-              ),
-            );
+    this.starting = this.startHelper(platform);
     try {
       await this.starting;
     } finally {
       this.starting = null;
+    }
+  }
+
+  private startHelper(platform: ComputerPlatform): Promise<void> {
+    switch (platform) {
+      case "macos":
+        return this.startMacHelper();
+      case "windows":
+        return this.startPipeHelper(windowsHelperPath(), "Windows");
+      case "linux":
+        return this.startPipeHelper(
+          linuxHelperPath(),
+          "Linux X11",
+          linuxDesktopEnvironment(),
+        );
+      case "unsupported":
+        return Promise.reject(
+          new ChatRoomError(
+            "UNSUPPORTED",
+            "Computer Use is supported only on macOS, Windows, and Linux X11",
+          ),
+        );
     }
   }
 
@@ -177,17 +199,21 @@ export class ComputerNativeHost {
     );
   }
 
-  private async startWindowsHelper(): Promise<void> {
-    const executable = windowsHelperPath();
+  private async startPipeHelper(
+    executable: string | null,
+    platformName: string,
+    env: NodeJS.ProcessEnv = process.env,
+  ): Promise<void> {
     if (!executable)
       throw new ChatRoomError(
         "UNSUPPORTED",
-        "Windows Computer helper is missing",
+        `${platformName} Computer helper is missing`,
       );
 
     const child = spawn(executable, [], {
       stdio: ["pipe", "pipe", "pipe"],
-      windowsHide: true,
+      windowsHide: process.platform === "win32",
+      env,
     });
     this.child = child;
     this.lines = createInterface({ input: child.stdout });
@@ -295,23 +321,103 @@ function projectRoot(): string {
 }
 
 function macHelperAppPath(): string | null {
-  const app = path.join(
-    projectRoot(),
-    "dist",
-    "native",
-    "macos",
-    "ChatRoomComputerHelper.app",
-  );
-  return existsSync(app) ? app : null;
+  return nativeHelperPath("macos", "ChatRoomComputerHelper.app");
 }
 
 function windowsHelperPath(): string | null {
-  const executable = path.join(
-    projectRoot(),
-    "dist",
-    "native",
-    "windows",
-    "chatroom-computer-helper.exe",
+  return nativeHelperPath("windows", "chatroom-computer-helper.exe");
+}
+
+function linuxHelperPath(): string | null {
+  return nativeHelperPath("linux", "chatroom-computer-helper");
+}
+
+function nativeHelperPath(...parts: string[]): string | null {
+  const target = path.join(projectRoot(), "dist", "native", ...parts);
+  return existsSync(target) ? target : null;
+}
+
+function linuxDesktopEnvironment(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  const uid = typeof process.getuid === "function" ? process.getuid() : null;
+
+  if (!env.XDG_RUNTIME_DIR && uid !== null) {
+    const runtimeDir = `/run/user/${uid}`;
+    if (existsSync(runtimeDir)) env.XDG_RUNTIME_DIR = runtimeDir;
+  }
+
+  if (!env.DISPLAY) {
+    const display = activeX11Display(uid);
+    if (display) {
+      env.DISPLAY = display;
+      env.XDG_SESSION_TYPE = "x11";
+    }
+  }
+
+  if (!env.XAUTHORITY) {
+    const candidates = [
+      env.HOME ? path.join(env.HOME, ".Xauthority") : null,
+      env.XDG_RUNTIME_DIR
+        ? path.join(env.XDG_RUNTIME_DIR, "gdm", "Xauthority")
+        : null,
+    ];
+    const authority = candidates.find(
+      (candidate): candidate is string => !!candidate && existsSync(candidate),
+    );
+    if (authority) env.XAUTHORITY = authority;
+  }
+
+  if (!env.DBUS_SESSION_BUS_ADDRESS && env.XDG_RUNTIME_DIR) {
+    const bus = path.join(env.XDG_RUNTIME_DIR, "bus");
+    if (existsSync(bus)) env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${bus}`;
+  }
+  return env;
+}
+
+function activeX11Display(uid: number | null): string | null {
+  if (process.platform !== "linux" || uid === null) return null;
+  const loginctl = existsSync("/usr/bin/loginctl")
+    ? "/usr/bin/loginctl"
+    : "loginctl";
+  const sessions = spawnSync(
+    loginctl,
+    ["list-sessions", "--no-legend", "--no-pager"],
+    {
+      encoding: "utf8",
+      timeout: 2_000,
+    },
   );
-  return existsSync(executable) ? executable : null;
+  if (sessions.status !== 0 || !sessions.stdout) return null;
+
+  const userId = String(uid);
+  for (const line of sessions.stdout.split("\n")) {
+    const [sessionId, sessionUid] = line.trim().split(/\s+/, 3);
+    if (!sessionId || sessionUid !== userId) continue;
+    const details = spawnSync(
+      loginctl,
+      [
+        "show-session",
+        sessionId,
+        "--no-pager",
+        "-p",
+        "Type",
+        "-p",
+        "Active",
+        "-p",
+        "Display",
+      ],
+      { encoding: "utf8", timeout: 2_000 },
+    );
+    if (details.status !== 0 || !details.stdout) continue;
+    const values = Object.fromEntries(
+      details.stdout
+        .split("\n")
+        .map((item) => item.split("=", 2))
+        .filter((item): item is [string, string] => item.length === 2),
+    );
+    if (values.Type === "x11" && values.Active === "yes" && values.Display) {
+      return values.Display;
+    }
+  }
+  return null;
 }

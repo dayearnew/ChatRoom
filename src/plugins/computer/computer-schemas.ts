@@ -35,7 +35,7 @@ export const computerScreenshotSchema = z.object({
 });
 
 export const computerNativeStatusSchema = z.object({
-  platform: z.enum(["macos", "windows", "unsupported"]),
+  platform: z.enum(["macos", "windows", "linux", "unsupported"]),
   helper: z.enum(["running", "stopped", "unavailable"]),
   permissions: z.object({
     accessibility: computerPermissionStateSchema,

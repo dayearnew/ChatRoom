@@ -1,6 +1,6 @@
 {
   "name": "@chatroomcp/chatroom",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "Local MCP runtime for ChatGPT with workspace, process, Cloud, and WebUI controls.",
   "bin": {
@@ -25,7 +25,7 @@
     "prepack": "npm run check",
     "build:native:macos": "node scripts/build-native-macos.mjs",
     "build:native:windows": "node scripts/build-native-windows.mjs",
-    "test:native:macos": "node --import tsx --test test/native-macos-helper.test.ts"
+    "build:native:linux": "node scripts/build-native-linux.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/node": "^2.0.0",
