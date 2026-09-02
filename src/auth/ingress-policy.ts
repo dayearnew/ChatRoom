@@ -10,7 +10,6 @@ export interface WebAuthnOrigin {
   rpId: string;
 }
 
-/** Classifies ingress exclusively from configured/registered public hosts. */
 export class IngressPolicy {
   constructor(
     private readonly config: ChatRoomConfig,

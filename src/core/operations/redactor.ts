@@ -1,4 +1,3 @@
-/** Redacts common credential shapes before values cross the durable operation-log boundary. */
 const SECRET_KEY = new RegExp(
   "(^|[_-])" +
     "(authorization|cookie|password|passwd|token|access[_-]?token|" +

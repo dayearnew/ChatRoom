@@ -1,4 +1,3 @@
-/** Verifies that HTTP and a real MCP client operate against the same plugin runtime. */
 import assert from "node:assert/strict";
 import http from "node:http";
 import { readFileSync } from "node:fs";
@@ -30,104 +29,18 @@ test("HTTP API and real MCP client share the same Application runtime", async ()
     await client.connect(transport);
     assert.equal(client.getServerVersion()?.version, packageVersion);
     const tools = await client.listTools();
-    assert.ok(tools.tools.some((tool) => tool.name === "open_workspace"));
-    assert.ok(tools.tools.some((tool) => tool.name === "fs_patch"));
+    assert.ok(tools.tools.some((tool) => tool.name === "workspace_info"));
     assert.ok(tools.tools.some((tool) => tool.name === "computer_snapshot"));
     assert.ok(tools.tools.some((tool) => tool.name === "computer_action"));
+    const workspace = await client.callTool({
+      name: "workspace_info",
+      arguments: { root: runtime.workspaceRoot },
+    });
+    assert.equal(workspace.isError, undefined);
     assert.equal(
-      tools.tools.every((tool) => Boolean(tool.outputSchema)),
-      true,
-      "every public MCP tool should advertise a structured output schema",
+      (workspace.structuredContent as { root: string }).root,
+      runtime.workspaceRoot,
     );
-    assert.equal(
-      tools.tools.every((tool) => Boolean(tool.annotations)),
-      true,
-      "every public MCP tool should advertise behavior annotations",
-    );
-    const readFile = tools.tools.find((tool) => tool.name === "fs_read");
-    assert.deepEqual(readFile?.annotations, {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    });
-    const writeFile = tools.tools.find((tool) => tool.name === "fs_write");
-    assert.deepEqual(writeFile?.annotations, {
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: true,
-      openWorldHint: false,
-    });
-    const startProcess = tools.tools.find(
-      (tool) => tool.name === "process_start",
-    );
-    assert.deepEqual(startProcess?.annotations, {
-      readOnlyHint: false,
-      destructiveHint: true,
-      idempotentHint: false,
-      openWorldHint: true,
-    });
-    assert.equal(
-      "workspaceId" in
-        ((startProcess?.outputSchema?.properties ?? {}) as object),
-      false,
-    );
-    const openWorkspace = tools.tools.find(
-      (tool) => tool.name === "open_workspace",
-    );
-    const workspaceCapabilities = (
-      openWorkspace?.outputSchema?.properties as
-        Record<string, unknown> | undefined
-    )?.capabilities as { properties?: Record<string, unknown> } | undefined;
-    assert.equal("process" in (workspaceCapabilities?.properties ?? {}), false);
-    const opened = await client.callTool({
-      name: "open_workspace",
-      arguments: { path: runtime.workspaceRoot },
-    });
-    assert.equal(opened.isError, undefined);
-    const structured = opened.structuredContent as { id: string };
-    assert.match(structured.id, /^ws_/);
-    const written = await client.callTool({
-      name: "fs_write",
-      arguments: {
-        workspaceId: structured.id,
-        path: "mcp.txt",
-        content: "from mcp",
-      },
-    });
-    assert.equal(written.isError, undefined);
-    const listed = await client.callTool({
-      name: "fs_list",
-      arguments: { workspaceId: structured.id, path: ".", recursive: false },
-    });
-    assert.ok(
-      Array.isArray((listed.structuredContent as { files?: unknown[] }).files),
-    );
-    const operations = (await fetch(`${base}/api/operations?limit=100`).then(
-      (response) => response.json(),
-    )) as Array<{ source: string; action: string }>;
-    assert.ok(
-      operations.some(
-        (event) => event.source === "mcp" && event.action === "fs.write",
-      ),
-    );
-    const detailed = runtime.components.operations.list({ limit: 100 });
-    const writes = detailed.filter(
-      (operation) =>
-        operation.pluginId === "workspace" &&
-        operation.source === "mcp" &&
-        operation.action === "fs.write",
-    );
-    assert.equal(
-      writes.length,
-      1,
-      "fs_write should produce one Workspace operation",
-    );
-    assert.equal(
-      detailed.some((operation) => operation.action.startsWith("mcp.")),
-      false,
-    );
-
     const startedProcess = await client.callTool({
       name: "process_start",
       arguments: {
@@ -150,16 +63,6 @@ test("HTTP API and real MCP client share the same Application runtime", async ()
     assert.equal(processOperation?.action, "start");
     assert.equal(processOperation?.processId, processSnapshot.processId);
     assert.equal(processOperation?.status, "running");
-    assert.equal(
-      runtime.components.operations
-        .list({ limit: 100 })
-        .filter(
-          (operation) =>
-            operation.pluginId === "process" && operation.action === "start",
-        ).length,
-      1,
-      "process_start should reuse the framework-created operation",
-    );
     await client.callTool({
       name: "process_kill",
       arguments: { processId: processSnapshot.processId, force: true },

@@ -43,6 +43,12 @@ interface RuntimeStatus {
   uptimeMinutes: number;
 }
 
+interface UpdateStatus {
+  latestVersion: string | null;
+  updateAvailable: boolean;
+  releaseUrl: string | null;
+}
+
 const nav = [
   { id: "workspaces", titleKey: "nav.workspaces", icon: "mdi-folder-outline" },
   { id: "processes", titleKey: "nav.processes", icon: "mdi-console-line" },
@@ -75,9 +81,11 @@ const locale = useLocale();
 const display = useDisplay();
 const drawer = ref(!display.smAndDown.value);
 const runtime = ref<RuntimeStatus | null>(null);
+const updateStatus = ref<UpdateStatus | null>(null);
 let stream: EventSource | null = null;
 let media: MediaQueryList | null = null;
 let runtimeTimer: ReturnType<typeof setInterval> | null = null;
+let updateTimer: ReturnType<typeof setInterval> | null = null;
 
 const current = computed(() => nav.find((item) => item.id === view.value)!);
 const currentTitle = computed(() =>
@@ -130,12 +138,14 @@ onMounted(async () => {
   if (authenticated.value) {
     connectEvents();
     startRuntimeStatus();
+    startUpdateCheck();
   }
 });
 
 onBeforeUnmount(() => {
   stream?.close();
   if (runtimeTimer) clearInterval(runtimeTimer);
+  if (updateTimer) clearInterval(updateTimer);
   media?.removeEventListener("change", applyTheme);
   window.removeEventListener("popstate", syncViewFromPath);
 });
@@ -193,9 +203,87 @@ function startRuntimeStatus() {
 async function loadRuntimeStatus() {
   try {
     runtime.value = await api<RuntimeStatus>("/runtime");
-  } catch {
-    // Runtime metadata is informational and must not affect the main UI.
+  } catch {}
+}
+
+function startUpdateCheck() {
+  if (updateTimer) clearInterval(updateTimer);
+  void loadUpdateStatus();
+  updateTimer = setInterval(
+    () => {
+      void loadUpdateStatus();
+    },
+    60 * 60 * 1000,
+  );
+}
+
+async function loadUpdateStatus() {
+  const currentVersion = runtime.value?.version;
+  if (!currentVersion) {
+    await loadRuntimeStatus();
   }
+  if (!runtime.value?.version) return;
+
+  try {
+    const response = await fetch(
+      "https://api.github.com/repos/dayearnew/ChatRoom/releases/latest",
+      {
+        headers: { accept: "application/vnd.github+json" },
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+    if (!response.ok) return;
+    const release = (await response.json()) as {
+      tag_name?: unknown;
+      html_url?: unknown;
+    };
+    if (typeof release.tag_name !== "string") return;
+    const latestVersion = normalizeVersion(release.tag_name);
+    updateStatus.value = {
+      latestVersion,
+      updateAvailable:
+        compareVersions(latestVersion, runtime.value.version) > 0,
+      releaseUrl:
+        typeof release.html_url === "string" ? release.html_url : null,
+    };
+  } catch {}
+}
+
+function normalizeVersion(value: string): string {
+  const trimmed = value.trim();
+  return trimmed.startsWith("v") ? trimmed.slice(1) : trimmed;
+}
+
+function compareVersions(left: string, right: string): number {
+  const a = parseVersion(left);
+  const b = parseVersion(right);
+  if (!a || !b) return 0;
+
+  for (let index = 0; index < 3; index += 1) {
+    const difference = a.core[index]! - b.core[index]!;
+    if (difference) return Math.sign(difference);
+  }
+  if (!a.prerelease && !b.prerelease) return 0;
+  if (!a.prerelease) return 1;
+  if (!b.prerelease) return -1;
+  return a.prerelease.localeCompare(b.prerelease, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function parseVersion(
+  value: string,
+): { core: [number, number, number]; prerelease: string | null } | null {
+  const match =
+    /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(
+      value.trim(),
+    );
+  if (!match) return null;
+  return {
+    core: [Number(match[1]), Number(match[2]), Number(match[3])],
+    prerelease: match[4] ?? null,
+  };
 }
 
 function viewFromPath(): View {
@@ -276,6 +364,7 @@ function completeLogin() {
   loginError.value = "";
   connectEvents();
   startRuntimeStatus();
+  startUpdateCheck();
 }
 
 async function logout() {
@@ -284,7 +373,12 @@ async function logout() {
     clearInterval(runtimeTimer);
     runtimeTimer = null;
   }
+  if (updateTimer) {
+    clearInterval(updateTimer);
+    updateTimer = null;
+  }
   runtime.value = null;
+  updateStatus.value = null;
   stream?.close();
   stream = null;
   authenticated.value = false;
@@ -371,7 +465,26 @@ async function removePasskey(id: string) {
           <div class="drawer-runtime">
             <div class="drawer-runtime-row">
               <span>{{ locale.t("$vuetify.chatroom.runtime.version") }}</span>
-              <strong>{{ runtime?.version ?? "—" }}</strong>
+              <div class="drawer-version-value">
+                <strong>{{ runtime?.version ?? "—" }}</strong>
+                <v-chip
+                  v-if="updateStatus?.updateAvailable"
+                  size="x-small"
+                  color="primary"
+                  variant="tonal"
+                  :href="updateStatus.releaseUrl ?? undefined"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  :title="
+                    locale.t(
+                      '$vuetify.chatroom.runtime.updateTitle',
+                      updateStatus.latestVersion ?? '',
+                    )
+                  "
+                >
+                  {{ locale.t("$vuetify.chatroom.runtime.updateAvailable") }}
+                </v-chip>
+              </div>
             </div>
             <div class="drawer-runtime-row">
               <span>{{

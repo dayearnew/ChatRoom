@@ -1,4 +1,3 @@
-/** Coordinates startup and shutdown ordering for runtime resources and internal plugins. */
 import type { ChatRoomConfig } from "../config/types.js";
 import {
   createApplication,

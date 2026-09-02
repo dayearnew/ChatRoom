@@ -1,4 +1,3 @@
-/** Shared Express helpers for async error propagation and typed ChatRoom error responses. */
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import {
   asChatRoomError,

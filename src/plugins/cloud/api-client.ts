@@ -128,6 +128,7 @@ export class CloudApiClient {
         ...payload,
         ...proof,
       }),
+      signal: AbortSignal.timeout(15_000),
     });
     const body = (await response.json().catch(() => null)) as unknown;
     if (!response.ok) {

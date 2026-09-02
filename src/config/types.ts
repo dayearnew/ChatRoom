@@ -1,4 +1,3 @@
-/** Runtime configuration after defaults and path normalization have been resolved. */
 export interface ChatRoomConfig {
   allowedRoots: string[];
   dataDir: string;

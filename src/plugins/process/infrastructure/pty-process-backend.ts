@@ -1,4 +1,3 @@
-/** Optional PTY ProcessBackend backed by node-pty when native PTY support is installed. */
 import { ChatRoomError } from "../../../core/errors/chatroom-error.js";
 import type { BackendProcess, ProcessBackend } from "../backend.js";
 
@@ -72,9 +71,7 @@ class PtyBackendProcess implements BackendProcess {
   onStdout(listener: (chunk: Buffer) => void): void {
     this.processHandle.onData((data) => listener(Buffer.from(data)));
   }
-  onStderr(_listener: (chunk: Buffer) => void): void {
-    /* PTYs expose a merged stream. */
-  }
+  onStderr(_listener: (chunk: Buffer) => void): void {}
   onExit(
     listener: (exit: {
       exitCode: number | null;

@@ -1,4 +1,3 @@
-/** Static architecture guard for ChatRoom dependency directions and implementation boundaries. */
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -59,6 +58,24 @@ for (const file of files.filter((entry) => /\.(?:ts|tsx|vue)$/.test(entry))) {
   ) {
     violations.push(
       `${relative}: protocol/presentation layer bypasses the application boundary`,
+    );
+  }
+
+  if (
+    relative.startsWith("src/plugins/git/") &&
+    /from\s+["'][^"']*workspace\//.test(content)
+  ) {
+    violations.push(
+      `${relative}: Git plugin must not depend on Workspace plugin`,
+    );
+  }
+
+  if (
+    relative.startsWith("src/plugins/workspace/") &&
+    /from\s+["'][^"']*git\//.test(content)
+  ) {
+    violations.push(
+      `${relative}: Workspace plugin must not depend on Git plugin`,
     );
   }
 

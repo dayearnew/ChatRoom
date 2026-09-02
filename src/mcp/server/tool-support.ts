@@ -12,20 +12,6 @@ export const closedRead = {
   openWorldHint: false,
 } satisfies ToolAnnotations;
 
-export const localWrite = {
-  readOnlyHint: false,
-  destructiveHint: true,
-  idempotentHint: true,
-  openWorldHint: false,
-} satisfies ToolAnnotations;
-
-export const localMutation = {
-  readOnlyHint: false,
-  destructiveHint: false,
-  idempotentHint: false,
-  openWorldHint: false,
-} satisfies ToolAnnotations;
-
 export const destructiveLocalMutation = {
   readOnlyHint: false,
   destructiveHint: true,
@@ -39,54 +25,6 @@ export const openWorldMutation = {
   idempotentHint: false,
   openWorldHint: true,
 } satisfies ToolAnnotations;
-
-export const workspaceOutputSchema = z.object({
-  id: z.string(),
-  root: z.string(),
-  sourceRoot: z.string(),
-  mode: z.enum(["checkout", "worktree"]),
-  createdAt: z.string(),
-  lastUsedAt: z.string(),
-  instructions: z.array(z.string()),
-  skills: z.array(z.string()),
-  capabilities: z.object({
-    filesystem: z.literal("read-write"),
-    git: z.boolean(),
-    skills: z.boolean(),
-  }),
-});
-
-export const fileReadOutputSchema = z.object({
-  content: z.string(),
-  bytes: z.number().int().nonnegative(),
-  truncated: z.boolean(),
-});
-
-export const fileWriteOutputSchema = z.object({
-  path: z.string(),
-  bytes: z.number().int().nonnegative(),
-});
-
-export const fileInfoSchema = z.object({
-  path: z.string(),
-  type: z.enum(["file", "directory", "symlink"]),
-  size: z.number().int().nonnegative(),
-  modifiedAt: z.string(),
-});
-
-export const searchMatchSchema = z.object({
-  path: z.string(),
-  line: z.number().int().positive(),
-  column: z.number().int().positive(),
-  preview: z.string(),
-});
-
-export const changeSetSchema = z.object({
-  files: z.array(z.string()),
-  replacements: z.number().int().nonnegative(),
-  bytesBefore: z.number().int().nonnegative(),
-  bytesAfter: z.number().int().nonnegative(),
-});
 
 export const processSnapshotSchema = z.object({
   processId: z.string(),

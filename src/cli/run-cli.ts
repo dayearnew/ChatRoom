@@ -1,4 +1,3 @@
-/** ChatRoom CLI host. */
 import { initializeConfig, loadConfig } from "../config/load-config.js";
 import { ApplicationLifecycle } from "../app/lifecycle.js";
 

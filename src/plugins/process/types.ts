@@ -1,7 +1,3 @@
-/**
- * Process lifecycle and request types shared above the platform-specific backend layer.
- * ProcessId is independent from the OS PID and transport/session identity.
- */
 type ProcessState = "running" | "exited" | "killed" | "failed";
 export type ProcessId = string;
 
@@ -26,7 +22,6 @@ export interface ProcessSnapshot {
   durationMs: number;
   exitCode: number | null;
   signal: string | null;
-  /** Bounded retained output rather than an unbounded transcript. */
   stdout: string;
   stderr: string;
   outputTruncated: boolean;

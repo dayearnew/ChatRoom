@@ -1,4 +1,3 @@
-/** Core OAuth security coverage for PKCE, token hashing, and one-time authorization codes. */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";

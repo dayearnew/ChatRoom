@@ -1,13 +1,13 @@
 {
   "name": "@chatroomcp/chatroom",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "description": "Local MCP runtime for ChatGPT with workspace, process, Cloud, and WebUI controls.",
   "bin": {
     "chatroom": "dist/cli/index.js"
   },
   "scripts": {
-    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "clean": "node scripts/clean-dist.mjs",
     "format": "prettier --write \"src/**/*.{ts,vue,css,html}\" \"test/**/*.ts\" \"scripts/**/*.mjs\" \"*.{json,ts}\"",
     "format:check": "prettier --check \"src/**/*.{ts,vue,css,html}\" \"test/**/*.ts\" \"scripts/**/*.mjs\" \"*.{json,ts}\"",
     "dev": "tsx watch src/cli/index.ts serve",
@@ -25,7 +25,8 @@
     "prepack": "npm run check",
     "build:native:macos": "node scripts/build-native-macos.mjs",
     "build:native:windows": "node scripts/build-native-windows.mjs",
-    "build:native:linux": "node scripts/build-native-linux.mjs"
+    "build:native:linux": "node scripts/build-native-linux.mjs",
+    "clean:all": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
     "@modelcontextprotocol/node": "^2.0.0",

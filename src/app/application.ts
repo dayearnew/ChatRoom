@@ -1,4 +1,3 @@
-/** Composition root for the single-package ChatRoom runtime. */
 import type { ChatRoomConfig } from "../config/types.js";
 import { AppDatabase } from "../infrastructure/database/app-database.js";
 import { OperationRepository } from "../infrastructure/database/operation-repository.js";
@@ -13,6 +12,7 @@ import { ExternalAccessRegistry } from "./external-access-registry.js";
 import { ServiceRegistry } from "../plugins/types.js";
 import { PluginManager } from "../plugins/plugin-manager.js";
 import { createWorkspacePlugin } from "../plugins/workspace/plugin.js";
+import { createGitPlugin } from "../plugins/git/plugin.js";
 import {
   createProcessPlugin,
   ProcessService,
@@ -69,6 +69,7 @@ export async function createApplication(
       },
       [
         createWorkspacePlugin(),
+        createGitPlugin(),
         createProcessPlugin(),
         createComputerPlugin(),
         createCloudPlugin(),

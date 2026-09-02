@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Normalizes runtime state values into a compact Vuetify status chip.
 import { computed } from "vue";
 import { useLocale } from "vuetify";
 import { statusMessageKey } from "../locales.js";

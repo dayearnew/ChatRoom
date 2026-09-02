@@ -26,6 +26,7 @@ export class CloudController {
   private lastError: string | null = null;
   private managementTimer: NodeJS.Timeout | null = null;
   private renewalTimer: NodeJS.Timeout | null = null;
+  private statusRetryTimer: NodeJS.Timeout | null = null;
   private stopped = true;
 
   private constructor(
@@ -51,6 +52,10 @@ export class CloudController {
   }
 
   status(): CloudStatus {
+    const lease =
+      this.state.lease && Date.parse(this.state.lease.expiresAt) > Date.now()
+        ? this.state.lease
+        : null;
     return {
       installationId: this.state.installationId,
       customerId: this.state.customerId,
@@ -62,10 +67,8 @@ export class CloudController {
         Date.parse(this.state.managementSession.expiresAt) > Date.now(),
       ),
       connection: this.connection,
-      mcpUrl: this.state.lease?.mcpBaseUrl
-        ? `${this.state.lease.mcpBaseUrl}/mcp`
-        : null,
-      webUrl: this.state.lease?.webBaseUrl ?? null,
+      mcpUrl: lease?.mcpBaseUrl ? `${lease.mcpBaseUrl}/mcp` : null,
+      webUrl: lease?.webBaseUrl ?? null,
       lastError: this.lastError,
     };
   }
@@ -73,7 +76,10 @@ export class CloudController {
   async start(): Promise<void> {
     if (!this.stopped) return;
     this.stopped = false;
-    await this.syncStatus().catch((error) => this.setError(error));
+    await this.syncStatus().catch((error) => {
+      this.setError(error);
+      this.scheduleStatusRetry();
+    });
     this.scheduleManagementSync();
   }
 
@@ -81,8 +87,10 @@ export class CloudController {
     this.stopped = true;
     if (this.managementTimer) clearTimeout(this.managementTimer);
     if (this.renewalTimer) clearTimeout(this.renewalTimer);
+    if (this.statusRetryTimer) clearTimeout(this.statusRetryTimer);
     this.managementTimer = null;
     this.renewalTimer = null;
+    this.statusRetryTimer = null;
     this.tunnel?.stop();
     this.tunnel = null;
     this.externalAccess?.clearCloud();
@@ -140,6 +148,8 @@ export class CloudController {
       this.scheduleRenewal();
     }
     this.lastError = null;
+    if (this.statusRetryTimer) clearTimeout(this.statusRetryTimer);
+    this.statusRetryTimer = null;
     return this.status();
   }
 
@@ -284,6 +294,18 @@ export class CloudController {
         ? activeLease.webBaseUrl
         : null,
     });
+  }
+
+  private scheduleStatusRetry(delayMs = 30_000): void {
+    if (this.stopped || this.statusRetryTimer) return;
+    this.statusRetryTimer = setTimeout(() => {
+      this.statusRetryTimer = null;
+      void this.syncStatus().catch((error) => {
+        this.setError(error);
+        this.scheduleStatusRetry();
+      });
+    }, delayMs);
+    this.statusRetryTimer.unref();
   }
 
   private scheduleManagementSync(delayMs = 3_000): void {

@@ -19,14 +19,10 @@ export function createChatRoomMcpHandler(
 }
 
 function createServer(plugins: PluginManager): McpServer {
-  const server = new McpServer(
-    { name: CHATROOM_NAME, version: CHATROOM_VERSION },
-    {
-      instructions:
-        "Workspace lifecycle is independent from MCP connections. " +
-        "Use WorkspaceId only with workspace tools and ProcessId only with process tools.",
-    },
-  );
+  const server = new McpServer({
+    name: CHATROOM_NAME,
+    version: CHATROOM_VERSION,
+  });
   plugins.registerMcp(server);
   return server;
 }

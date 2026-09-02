@@ -1,28 +1,50 @@
-/** Utilities for bounding JSON-like operation payloads before persistence. */
 export interface BoundedValue<T = unknown> {
   value: T;
   truncated: boolean;
 }
 
 export function boundJson(value: unknown, maxBytes: number): BoundedValue {
-  // Preserve both the beginning and end of oversized strings because failures commonly appear at the tail.
   if (value === undefined) return { value: null, truncated: false };
   const json = safeStringify(value);
   const size = Buffer.byteLength(json);
   if (size <= maxBytes)
     return { value: JSON.parse(json) as unknown, truncated: false };
 
-  const marker = "\n…[truncated]…\n";
-  const budget = Math.max(0, maxBytes - Buffer.byteLength(marker));
-  const headBudget = Math.floor(budget / 2);
-  const tailBudget = budget - headBudget;
   const encoded = Buffer.from(json);
-  const head = encoded.subarray(0, headBudget).toString("utf8");
-  const tail = encoded.subarray(encoded.length - tailBudget).toString("utf8");
-  const text = `${head}${marker}${tail}`;
+  const marker = "\n…[truncated]…\n";
+  let low = 0;
+  let high = encoded.length;
+  let best = truncatedValue(encoded, marker, size, 0);
+
+  while (low <= high) {
+    const retainedBytes = Math.floor((low + high) / 2);
+    const candidate = truncatedValue(encoded, marker, size, retainedBytes);
+    if (Buffer.byteLength(JSON.stringify(candidate)) <= maxBytes) {
+      best = candidate;
+      low = retainedBytes + 1;
+    } else {
+      high = retainedBytes - 1;
+    }
+  }
+
+  return { value: best, truncated: true };
+}
+
+function truncatedValue(
+  encoded: Buffer,
+  marker: string,
+  originalBytes: number,
+  retainedBytes: number,
+) {
+  const headBytes = Math.floor(retainedBytes / 2);
+  const tailBytes = retainedBytes - headBytes;
+  const head = encoded.subarray(0, headBytes).toString("utf8");
+  const tail = encoded
+    .subarray(Math.max(0, encoded.length - tailBytes))
+    .toString("utf8");
   return {
-    value: { truncatedJson: text, originalBytes: size },
-    truncated: true,
+    truncatedJson: `${head}${marker}${tail}`,
+    originalBytes,
   };
 }
 

@@ -15,7 +15,7 @@ const sources = [
   "native/macos/Protocol.swift",
   "native/macos/main.swift",
 ];
-const deploymentTarget = process.env.CHATROOM_MACOS_DEPLOYMENT_TARGET ?? "15.2";
+const deploymentTarget = process.env.CHATROOM_MACOS_DEPLOYMENT_TARGET ?? "14.0";
 const architectures = (process.env.CHATROOM_MACOS_ARCHS ?? "arm64,x86_64")
   .split(",")
   .map((value) => value.trim())

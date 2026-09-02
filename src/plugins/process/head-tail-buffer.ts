@@ -1,4 +1,3 @@
-/** Bounded process-output buffer that preserves useful context from both ends of a stream. */
 interface BufferSnapshot {
   text: string;
   bytesSeen: number;

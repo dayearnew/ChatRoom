@@ -1,4 +1,3 @@
-/** Express/HTTP transport host for REST, OAuth, MCP, plugins, and the built WebUI. */
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";

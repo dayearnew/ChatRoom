@@ -15,7 +15,6 @@ type PluginToolAction<Input> = string | ((input: Input) => string);
 
 export interface PluginToolExecution {
   readonly operationId: string;
-  /** Keep the operation running after the MCP handler returns. The owner must finish it later. */
   deferCompletion(): void;
 }
 
@@ -36,7 +35,6 @@ export interface PluginToolConfig<
   present?: (output: unknown) => CallToolResult;
 }
 
-/** Framework-owned MCP registration boundary that guarantees every plugin tool is audited. */
 export class PluginMcpRegistrar {
   constructor(
     private readonly server: McpServer,
@@ -96,16 +94,10 @@ export class PluginMcpRegistrar {
   }
 }
 
-function operationReferences(input: unknown): {
-  workspaceId?: string;
-  processId?: string;
-} {
+function operationReferences(input: unknown): { processId?: string } {
   if (!input || typeof input !== "object" || Array.isArray(input)) return {};
   const record = input as Record<string, unknown>;
   return {
-    ...(typeof record.workspaceId === "string"
-      ? { workspaceId: record.workspaceId }
-      : {}),
     ...(typeof record.processId === "string"
       ? { processId: record.processId }
       : {}),

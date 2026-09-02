@@ -114,16 +114,12 @@ export class CloudTunnelClient {
     this.acceptingServices = new Set(lease.services);
     if (this.stopped) return;
 
-    // A new signed lease on the same tunnel is applied in-band. This keeps the
-    // current WebUI/API request alive while service permissions change.
     if (!tunnelChanged) {
       if (this.socket?.readyState === WebSocket.OPEN)
         this.send({ type: "update-lease", lease: lease.token });
       return;
     }
 
-    // Changing the tunnel endpoint still requires a reconnect. If a service is
-    // being removed, let current streams finish before moving the connection.
     if (!removesService || this.streams.size === 0) {
       this.socket?.close();
       return;

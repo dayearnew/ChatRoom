@@ -1,4 +1,3 @@
-/** Lightweight in-process event bus used to fan runtime changes out to SSE/WebUI observers. */
 import { EventEmitter } from "node:events";
 import type { Operation } from "../core/operations/types.js";
 import type { ProcessSnapshot } from "../plugins/process/types.js";
@@ -9,12 +8,7 @@ export type RuntimeEvent =
   | { type: "operations-cleared"; deleted: number; preserved: number }
   | { type: "process"; process: ProcessSnapshot }
   | { type: "computer-settings"; settings: ComputerSettings }
-  | {
-      type: "process-output";
-      processId: string;
-      stream: "stdout" | "stderr";
-      chunk: string;
-    };
+  | { type: "process-output"; processId: string };
 
 export class RuntimeEventBus {
   private readonly emitter = new EventEmitter();

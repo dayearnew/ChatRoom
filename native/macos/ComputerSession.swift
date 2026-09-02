@@ -129,7 +129,6 @@ final class ComputerSession {
         requestedDisplayId = selectedDisplay.id
         currentDisplayBounds = CGDisplayBounds(nativeDisplay)
 
-        // Starting any new snapshot invalidates the previous element registry immediately.
         let snapshotId = UUID().uuidString
         currentSnapshotId = snapshotId
         accessibility.resetElements()
@@ -224,7 +223,6 @@ final class ComputerSession {
             currentDisplayBounds = CGDisplayBounds(CGMainDisplayID())
         }
 
-        // Once mutation begins, the caller's snapshot is no longer valid.
         currentSnapshotId = nil
         var modes = Set<ExecutionMode>()
         var focusChanged = false

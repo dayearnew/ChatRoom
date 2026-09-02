@@ -1,7 +1,3 @@
-/**
- * Implements owner authentication and the OAuth Authorization Code + PKCE flow used for remote MCP access.
- * Raw authorization codes and access tokens are never persisted; repositories receive only their hashes.
- */
 import {
   createHash,
   randomBytes,

@@ -16,7 +16,6 @@ import type {
 } from "../core/operations/repository.js";
 import type { RuntimeEventBus } from "../app/event-bus.js";
 
-/** Persists redacted, bounded operations produced by ChatRoom plugins. */
 export class OperationLog {
   private readonly redactor = new SecretRedactor();
 
@@ -37,7 +36,6 @@ export class OperationLog {
       source: request.source,
       action: request.action,
       status: "running",
-      workspaceId: request.workspaceId ?? null,
       processId: request.processId ?? null,
       input: input.value,
       output: null,
@@ -81,20 +79,6 @@ export class OperationLog {
     return operation;
   }
 
-  updateRunning(operationId: string, output: unknown): Operation {
-    const operation = this.require(operationId);
-    if (operation.status !== "running") return operation;
-    const bounded = boundJson(
-      this.redactor.redact(output),
-      this.maxPayloadBytes,
-    );
-    operation.output = bounded.value;
-    operation.outputTruncated = bounded.truncated;
-    this.repository.update(operation);
-    this.eventBus.emit({ type: "operation", operation });
-    return operation;
-  }
-
   async run<T>(request: OperationStart, action: () => Promise<T>): Promise<T> {
     const operation = this.start(request);
     try {
@@ -122,11 +106,9 @@ export class OperationLog {
 
   associate(
     operationId: string,
-    references: { workspaceId?: string | null; processId?: string | null },
+    references: { processId?: string | null },
   ): Operation {
     const operation = this.require(operationId);
-    if (references.workspaceId !== undefined)
-      operation.workspaceId = references.workspaceId;
     if (references.processId !== undefined)
       operation.processId = references.processId;
     this.repository.update(operation);

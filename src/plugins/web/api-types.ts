@@ -1,5 +1,11 @@
 import type { Operation as DomainOperation } from "../../core/operations/types.js";
-import type { GitInfo } from "../workspace/domain/git.js";
+import type {
+  GitBranch,
+  GitChange,
+  GitCommit,
+  GitDiff,
+  GitStatus,
+} from "../git/types.js";
 import type { ProcessSnapshot } from "../process/types.js";
 import type {
   ComputerDisplay,
@@ -7,19 +13,27 @@ import type {
   ComputerSnapshot,
   ComputerStatus,
 } from "../computer/types.js";
-import type { Workspace } from "../workspace/domain/workspace.js";
 import type {
-  WorktreeApplyPreview,
-  WorktreeFileDiff,
-} from "../workspace/domain/review.js";
+  WorkspaceEntry,
+  WorkspaceFile,
+  WorkspaceInfo,
+  WorkspaceSkill,
+} from "../workspace/types.js";
 
 export type {
   ComputerDisplay,
   ComputerPermission,
   ComputerStatus,
+  GitBranch,
+  GitChange,
+  GitCommit,
+  GitDiff,
+  GitStatus,
   ProcessSnapshot,
-  WorktreeApplyPreview,
-  WorktreeFileDiff,
+  WorkspaceEntry,
+  WorkspaceFile,
+  WorkspaceInfo,
+  WorkspaceSkill,
 };
 
 export interface ComputerPreviewView {
@@ -34,7 +48,3 @@ export interface ComputerPreviewView {
 }
 
 export type Operation = DomainOperation;
-
-export interface WorkspaceView extends Workspace {
-  git?: GitInfo | null;
-}

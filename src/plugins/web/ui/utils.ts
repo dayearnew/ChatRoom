@@ -1,4 +1,3 @@
-/** Presentation-only formatting helpers shared by WebUI components. */
 export function duration(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)} ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;

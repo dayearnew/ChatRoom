@@ -1,4 +1,3 @@
-/** Persistent plugin operation lifecycle recorded by ChatRoom. */
 export const OPERATION_STATUSES = [
   "running",
   "success",
@@ -7,7 +6,6 @@ export const OPERATION_STATUSES = [
 ] as const;
 export type OperationStatus = (typeof OPERATION_STATUSES)[number];
 
-/** Where an operation was initiated; pluginId identifies which plugin owns the operation. */
 export const OPERATION_SOURCES = ["mcp", "gui", "system", "cli"] as const;
 export type OperationSource = (typeof OPERATION_SOURCES)[number];
 
@@ -17,7 +15,6 @@ export interface Operation {
   source: OperationSource;
   action: string;
   status: OperationStatus;
-  workspaceId: string | null;
   processId: string | null;
   input: unknown;
   output: unknown;
@@ -34,6 +31,5 @@ export interface OperationStart {
   source: OperationSource;
   action: string;
   input?: unknown;
-  workspaceId?: string | null;
   processId?: string | null;
 }

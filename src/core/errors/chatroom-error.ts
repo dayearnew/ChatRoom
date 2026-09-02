@@ -1,10 +1,3 @@
-/**
- * Typed error vocabulary exposed across ChatRoom application boundaries.
- *
- * Presentation adapters translate these stable codes into protocol responses. Domain/application
- * code should prefer ChatRoomError over parsing message text or leaking implementation-specific
- * filesystem, SQLite, process, or SDK errors to external callers.
- */
 export const ERROR_CODES = [
   "INVALID_INPUT",
   "NOT_FOUND",
@@ -17,7 +10,6 @@ export const ERROR_CODES = [
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
-/** Error carrying a stable machine-readable code plus optional structured diagnostic details. */
 export class ChatRoomError extends Error {
   readonly code: ErrorCode;
   readonly details?: unknown;
@@ -35,13 +27,6 @@ export class ChatRoomError extends Error {
   }
 }
 
-/**
- * Normalize an arbitrary thrown value at an application or protocol boundary.
- *
- * Existing ChatRoomError instances retain their public code. Native Error values become INTERNAL
- * while preserving the original error as `cause`; non-Error throws are converted as well so every
- * external path observes the same error vocabulary.
- */
 export function asChatRoomError(error: unknown): ChatRoomError {
   if (error instanceof ChatRoomError) return error;
   if (error instanceof Error) {

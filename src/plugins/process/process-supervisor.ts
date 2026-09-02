@@ -1,7 +1,3 @@
-/**
- * Owns all ChatRoom-managed process lifecycle, timeout handling, output buffering, stdin, and process operation events.
- * Platform-specific creation details are delegated to pipe/PTY backends.
- */
 import { randomUUID } from "node:crypto";
 import { ChatRoomError } from "../../core/errors/chatroom-error.js";
 import { childEnvironment } from "../../core/runtime/child-environment.js";
@@ -28,6 +24,7 @@ interface ManagedProcess {
   signal: string | null;
   timeout: NodeJS.Timeout | null;
   forceTimeout: NodeJS.Timeout | null;
+  outputEventTimer: NodeJS.Timeout | null;
   timedOut: boolean;
   operationId: string;
   settled: Promise<ProcessSnapshot>;
@@ -84,7 +81,6 @@ export class ProcessSupervisor {
     if (adoptedOperation) this.operations.associate(operationId, { processId });
     let backend: BackendProcess;
     try {
-      // Child environments inherit only the runtime allowlist, then apply explicit request overrides.
       backend = await (
         request.pty ? this.backends.pty : this.backends.pipe
       ).start(request.command, args, {
@@ -117,6 +113,7 @@ export class ProcessSupervisor {
       signal: null,
       timeout: null,
       forceTimeout: null,
+      outputEventTimer: null,
       timedOut: false,
       operationId,
       settled,
@@ -133,7 +130,6 @@ export class ProcessSupervisor {
       managed.timeout = setTimeout(() => {
         if (managed.state !== "running") return;
         managed.timedOut = true;
-        // Timeouts first request graceful termination and escalate to SIGKILL only if the backend remains alive.
         managed.backend.kill("SIGTERM");
         managed.forceTimeout = setTimeout(() => {
           if (managed.state === "running") managed.backend.kill("SIGKILL");
@@ -181,7 +177,6 @@ export class ProcessSupervisor {
         Promise.allSettled(survivors.map(([, item]) => item.settled)),
         new Promise((resolve) => setTimeout(resolve, 1500)),
       ]);
-      // A backend that does not report close after SIGKILL must still be settled before SQLite closes.
       for (const [processId, item] of survivors)
         if (item.state === "running") this.onExit(processId, null, "SIGKILL");
     }
@@ -194,22 +189,14 @@ export class ProcessSupervisor {
   ): void {
     const item = this.processes.get(processId);
     if (!item || item.state !== "running") return;
-    // Store only bounded head/tail output while forwarding live chunks to SSE.
     (stream === "stdout" ? item.stdout : item.stderr).append(chunk);
-    const text = chunk.toString("utf8");
-    this.eventBus.emit({
-      type: "process-output",
-      processId,
-      stream,
-      chunk: text,
-    });
-    const snapshot = this.snapshotOf(processId, item);
-    this.operations.updateRunning(item.operationId, {
-      stdout: snapshot.stdout,
-      stderr: snapshot.stderr,
-      outputTruncated: snapshot.outputTruncated,
-      pid: snapshot.pid,
-    });
+    if (!item.outputEventTimer) {
+      item.outputEventTimer = setTimeout(() => {
+        item.outputEventTimer = null;
+        if (item.state === "running")
+          this.eventBus.emit({ type: "process-output", processId });
+      }, 500).unref();
+    }
   }
   private onExit(
     processId: string,
@@ -220,7 +207,7 @@ export class ProcessSupervisor {
     if (!item || item.state !== "running") return;
     if (item.timeout) clearTimeout(item.timeout);
     if (item.forceTimeout) clearTimeout(item.forceTimeout);
-    // A signal is represented as killed/cancelled; otherwise zero means exited and non-zero means failed.
+    if (item.outputEventTimer) clearTimeout(item.outputEventTimer);
     item.finishedAt = new Date();
     item.exitCode = exitCode;
     item.signal = signal;

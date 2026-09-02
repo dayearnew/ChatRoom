@@ -2,11 +2,17 @@ export type {
   ComputerPermission,
   ComputerPreviewView,
   ComputerStatus,
+  GitBranch,
+  GitChange,
+  GitCommit,
+  GitDiff,
+  GitStatus,
   Operation,
   ProcessSnapshot,
-  WorkspaceView as Workspace,
-  WorktreeApplyPreview,
-  WorktreeFileDiff,
+  WorkspaceEntry,
+  WorkspaceFile,
+  WorkspaceInfo,
+  WorkspaceSkill,
 } from "../api-types.js";
 
 export class ApiError extends Error {

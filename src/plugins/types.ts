@@ -8,7 +8,6 @@ import type { ExternalAccessRegistry } from "../app/external-access-registry.js"
 export interface ServiceToken<T> {
   readonly key: symbol;
   readonly name: string;
-  /** Compile-time marker only; it is never set at runtime. */
   readonly __type?: T;
 }
 export function createServiceToken<T>(name: string): ServiceToken<T> {

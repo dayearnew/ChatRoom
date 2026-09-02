@@ -1,4 +1,3 @@
-/** Shared temporary runtime fixture used by integration and security tests. */
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -61,9 +60,7 @@ export async function createTestRuntime(
       await components.plugins.stop().catch(() => undefined);
       try {
         components.database.close();
-      } catch {
-        /* already closed */
-      }
+      } catch {}
       await rm(root, { recursive: true, force: true });
     },
   };

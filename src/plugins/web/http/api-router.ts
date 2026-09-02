@@ -1,4 +1,3 @@
-/** HTTP/JSON presentation adapter for runtime status, workspaces, operations, processes, and management actions. */
 import { Router, type RequestHandler } from "express";
 import type { WebRuntime } from "../runtime.js";
 import type { RuntimeEventBus } from "../../../app/event-bus.js";
@@ -16,6 +15,7 @@ import {
 } from "../../../presentation/http/http-utils.js";
 import { createProcessApiRouter } from "./process-api-router.js";
 import { createWorkspaceApiRouter } from "./workspace-api-router.js";
+import { createGitApiRouter } from "./git-api-router.js";
 import type { IngressPolicy } from "../../../auth/ingress-policy.js";
 import type { CloudController } from "../../cloud/controller.js";
 import { createCloudApiRouter } from "./cloud-api-router.js";
@@ -147,9 +147,6 @@ export function createApiRouter(
         ...(typeof req.query.status === "string"
           ? { status: req.query.status }
           : {}),
-        ...(typeof req.query.workspaceId === "string"
-          ? { workspaceId: req.query.workspaceId }
-          : {}),
       }),
     );
   });
@@ -163,6 +160,7 @@ export function createApiRouter(
     res.json(event);
   });
   router.use(createWorkspaceApiRouter(application));
+  router.use(createGitApiRouter(application));
   router.use(createProcessApiRouter(application));
   router.use(
     createComputerApiRouter(

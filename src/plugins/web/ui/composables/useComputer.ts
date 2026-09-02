@@ -86,9 +86,7 @@ export function useComputer(revision: () => number) {
       return;
     try {
       status.value = await api<ComputerStatus>("/computer/status");
-    } catch {
-      // The page-level refresh path owns persistent connection errors.
-    }
+    } catch {}
   }
 
   async function updateSetting(

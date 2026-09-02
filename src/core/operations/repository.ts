@@ -5,7 +5,6 @@ export interface OperationQuery {
   offset?: number;
   pluginId?: string;
   status?: OperationStatus | string;
-  workspaceId?: string;
 }
 
 export interface OperationRepository {

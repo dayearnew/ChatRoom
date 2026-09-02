@@ -8,7 +8,7 @@
   <a href="../README.md">English</a> | 简体中文 | <a href="https://doc.chatroomcp.com/zh/">文档</a>
 </p>
 
-ChatRoom 是一个本地 MCP Runtime，让 ChatGPT 可以操作设备上的文件、Git Worktree 和进程。WebUI 用于浏览工作区、查看进程、管理 ChatRoom Cloud，并按插件查看操作日志。
+ChatRoom 是一个本地 MCP Runtime，让 ChatGPT 可以处理设备上的项目和进程。WebUI 用于浏览工作区、管理 Git 仓库和进程、管理 ChatRoom Cloud，并按插件查看操作日志。
 
 ## 安装
 

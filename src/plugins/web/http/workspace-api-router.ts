@@ -1,60 +1,63 @@
 import { Router } from "express";
-import type { WebRuntime } from "../runtime.js";
 import { ChatRoomError } from "../../../core/errors/chatroom-error.js";
 import {
   asyncRoute,
   requireString,
 } from "../../../presentation/http/http-utils.js";
+import type { WebRuntime } from "../runtime.js";
 
 export function createWorkspaceApiRouter(application: WebRuntime): Router {
   const router = Router();
+
   router.get(
     "/workspaces",
     asyncRoute(async (_req, res) => {
-      res.json(await application.discoverWorkspaces());
+      res.json(await application.workspaces.list());
     }),
   );
+
   router.get(
-    "/workspaces/:workspaceId",
+    "/workspace",
     asyncRoute(async (req, res) => {
-      const workspaceId = requireString(req.params.workspaceId, "workspaceId");
-      const workspace = application.getWorkspace(workspaceId);
-      const git = workspace.capabilities.git
-        ? await application.gitInfoQuery(workspace.id)
-        : null;
-      res.json({ ...workspace, git });
-    }),
-  );
-  router.get(
-    "/workspaces/:workspaceId/files",
-    asyncRoute(async (req, res) => {
-      const workspaceId = requireString(req.params.workspaceId, "workspaceId");
-      const filePath =
-        typeof req.query.path === "string" ? req.query.path : ".";
-      const recursive = req.query.recursive === "1";
       res.json(
-        await application.listWorkspaceFiles(workspaceId, filePath, recursive),
-      );
-    }),
-  );
-  router.get(
-    "/workspaces/:workspaceId/file",
-    asyncRoute(async (req, res) => {
-      const workspaceId = requireString(req.params.workspaceId, "workspaceId");
-      const filePath = requireString(req.query.path, "path");
-      res.json(
-        await application.readWorkspaceFile(
-          workspaceId,
-          filePath,
-          2 * 1024 * 1024,
+        await application.workspaces.info(
+          requireString(req.query.root, "root"),
         ),
       );
     }),
   );
+
   router.get(
-    "/workspaces/:workspaceId/file/image",
+    "/workspace/files",
     asyncRoute(async (req, res) => {
-      const workspaceId = requireString(req.params.workspaceId, "workspaceId");
+      const fs = await application.workspaces.fs(
+        requireString(req.query.root, "root"),
+      );
+      const filePath =
+        typeof req.query.path === "string" ? req.query.path : ".";
+      res.json(
+        await fs.list(filePath, { recursive: req.query.recursive === "1" }),
+      );
+    }),
+  );
+
+  router.get(
+    "/workspace/file",
+    asyncRoute(async (req, res) => {
+      const fs = await application.workspaces.fs(
+        requireString(req.query.root, "root"),
+      );
+      res.json(
+        await fs.read(requireString(req.query.path, "path"), {
+          maxBytes: 2 * 1024 * 1024,
+        }),
+      );
+    }),
+  );
+
+  router.get(
+    "/workspace/file/image",
+    asyncRoute(async (req, res) => {
       const filePath = requireString(req.query.path, "path");
       const mime = imageMime(filePath);
       if (!mime)
@@ -62,11 +65,10 @@ export function createWorkspaceApiRouter(application: WebRuntime): Router {
           "INVALID_INPUT",
           "File type is not supported for image preview",
         );
-      const file = await application.readWorkspaceFileBytes(
-        workspaceId,
-        filePath,
-        10 * 1024 * 1024,
+      const fs = await application.workspaces.fs(
+        requireString(req.query.root, "root"),
       );
+      const file = await fs.readBytes(filePath, { maxBytes: 10 * 1024 * 1024 });
       if (file.truncated)
         throw new ChatRoomError(
           "INVALID_INPUT",
@@ -79,56 +81,12 @@ export function createWorkspaceApiRouter(application: WebRuntime): Router {
       res.send(file.data);
     }),
   );
-  router.get(
-    "/workspaces/:workspaceId/worktree/diff",
-    asyncRoute(async (req, res) => {
-      res.json(
-        await application.previewWorktreeApply(
-          requireString(req.params.workspaceId, "workspaceId"),
-        ),
-      );
-    }),
-  );
-  router.get(
-    "/workspaces/:workspaceId/worktree/diff/file",
-    asyncRoute(async (req, res) => {
-      const workspaceId = requireString(req.params.workspaceId, "workspaceId");
-      res.json(
-        await application.previewWorktreeFileDiff(
-          workspaceId,
-          requireString(req.query.path, "path"),
-        ),
-      );
-    }),
-  );
-  router.post(
-    "/workspaces/:workspaceId/worktree/apply",
-    asyncRoute(async (req, res) => {
-      const workspaceId = requireString(req.params.workspaceId, "workspaceId");
-      const body = (req.body ?? {}) as Record<string, unknown>;
-      if (
-        body.paths !== undefined &&
-        (!Array.isArray(body.paths) ||
-          body.paths.some((value) => typeof value !== "string"))
-      )
-        throw new ChatRoomError(
-          "INVALID_INPUT",
-          "paths must be an array of file paths",
-        );
-      res.json(
-        await application.applyWorktree(
-          workspaceId,
-          body.paths as string[] | undefined,
-        ),
-      );
-    }),
-  );
+
   return router;
 }
 
 function imageMime(filePath: string): string | null {
-  const extension = filePath.split(".").pop()?.toLowerCase();
-  switch (extension) {
+  switch (filePath.split(".").pop()?.toLowerCase()) {
     case "png":
       return "image/png";
     case "jpg":

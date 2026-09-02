@@ -7,7 +7,6 @@ export interface ExternalAccessState {
   webBaseUrl: string | null;
 }
 
-/** Combines configured self-hosted URLs with the current ChatRoom Cloud URLs. */
 export class ExternalAccessRegistry {
   private cloud: ExternalAccessState = { mcpBaseUrl: null, webBaseUrl: null };
 

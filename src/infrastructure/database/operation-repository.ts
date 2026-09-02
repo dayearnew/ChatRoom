@@ -13,10 +13,10 @@ export class OperationRepository implements OperationRepositoryPort {
       .prepare(
         `
         INSERT INTO operations(
-          operation_id, plugin_id, source, action, status, workspace_id, process_id,
+          operation_id, plugin_id, source, action, status, process_id,
           input_json, output_json, error_json, input_truncated, output_truncated,
           started_at, finished_at, duration_ms
-        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `,
       )
       .run(...toRowValues(operation));
@@ -27,7 +27,7 @@ export class OperationRepository implements OperationRepositoryPort {
       .prepare(
         `
         UPDATE operations SET
-          plugin_id=?, source=?, action=?, status=?, workspace_id=?, process_id=?,
+          plugin_id=?, source=?, action=?, status=?, process_id=?,
           input_json=?, output_json=?, error_json=?, input_truncated=?, output_truncated=?,
           started_at=?, finished_at=?, duration_ms=?
         WHERE operation_id=?
@@ -53,10 +53,6 @@ export class OperationRepository implements OperationRepositoryPort {
     if (query.status) {
       where.push("status=?");
       args.push(query.status);
-    }
-    if (query.workspaceId) {
-      where.push("workspace_id=?");
-      args.push(query.workspaceId);
     }
     const limit = Math.min(Math.max(query.limit ?? 100, 1), 500);
     const offset = Math.max(query.offset ?? 0, 0);
@@ -120,7 +116,6 @@ interface OperationRow {
   source: Operation["source"];
   action: string;
   status: Operation["status"];
-  workspace_id: string | null;
   process_id: string | null;
   input_json: string;
   output_json: string;
@@ -139,7 +134,6 @@ function toRowValues(operation: Operation): Array<string | number | null> {
     operation.source,
     operation.action,
     operation.status,
-    operation.workspaceId,
     operation.processId,
     JSON.stringify(operation.input),
     JSON.stringify(operation.output),
@@ -159,7 +153,6 @@ function fromRow(row: OperationRow): Operation {
     source: row.source,
     action: row.action,
     status: row.status,
-    workspaceId: row.workspace_id,
     processId: row.process_id,
     input: parse(row.input_json),
     output: parse(row.output_json),

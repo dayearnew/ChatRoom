@@ -1,4 +1,3 @@
-/** Pipe-based ProcessBackend implemented with Node child_process.spawn. */
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { BackendProcess, ProcessBackend } from "../backend.js";
 

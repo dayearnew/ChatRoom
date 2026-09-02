@@ -1,4 +1,3 @@
-/** OS/process-backend port consumed by ProcessSupervisor. */
 export interface BackendProcess {
   readonly pid: number | null;
   write(data: string): void;

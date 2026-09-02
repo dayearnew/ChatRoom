@@ -1,4 +1,3 @@
-/** OAuth and owner-session HTTP routes backed by AuthService rather than protocol-specific persistence logic. */
 import { Router, type ErrorRequestHandler } from "express";
 import type {
   AuthService,

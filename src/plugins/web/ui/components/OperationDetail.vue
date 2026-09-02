@@ -72,10 +72,6 @@ function terminalText(value: unknown): string | null {
             : `${event.durationMs} ms`
         }}</strong>
       </div>
-      <div v-if="event.workspaceId">
-        <span>{{ locale.t("$vuetify.chatroom.detail.workspace") }}</span
-        ><strong class="mono">{{ event.workspaceId.slice(0, 16) }}</strong>
-      </div>
       <div v-if="event.processId">
         <span>{{ locale.t("$vuetify.chatroom.detail.process") }}</span
         ><strong class="mono">{{ event.processId.slice(0, 16) }}</strong>

@@ -127,6 +127,19 @@ body {
   white-space: nowrap;
 }
 
+.drawer-version-value {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.drawer-version-value .v-chip {
+  flex: 0 0 auto;
+  font-family: inherit;
+}
+
 .drawer-actions {
   display: flex;
   align-items: center;
@@ -700,35 +713,17 @@ body {
   flex: 0 0 240px;
 }
 
-.workspace-context-switcher {
-  width: 176px;
-  max-width: 100%;
-  flex: 0 0 176px;
-}
-
-.workspace-switcher .v-field,
-.workspace-context-switcher .v-field {
+.workspace-switcher .v-field {
   min-height: 36px;
   border-radius: 10px;
 }
 
-.workspace-switcher .v-field__input,
-.workspace-context-switcher .v-field__input {
+.workspace-switcher .v-field__input {
   min-height: 34px;
   padding-top: 0;
   padding-bottom: 0;
   font-size: 14px;
   font-weight: 700;
-}
-
-.workspace-header-chips {
-  flex: 0 0 auto;
-}
-
-.workspace-name {
-  font-size: 17px;
-  font-weight: 720;
-  letter-spacing: -0.02em;
 }
 
 .workspace-path {
@@ -739,32 +734,6 @@ body {
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.workspace-summary {
-  display: flex;
-  gap: 24px;
-  padding: 11px 20px;
-  overflow-x: auto;
-  border-top: 1px solid rgb(var(--v-theme-outline), 0.08);
-  border-bottom: 1px solid rgb(var(--v-theme-outline), 0.08);
-}
-
-.summary-item {
-  display: flex;
-  min-width: max-content;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.summary-item span {
-  color: rgb(var(--v-theme-on-surface), 0.48);
-  font-size: 11px;
-}
-
-.summary-item strong {
-  font-size: 12px;
-  font-weight: 650;
 }
 
 .workspace-tabs,
@@ -789,111 +758,40 @@ body {
   padding-inline: 12px;
 }
 
-.worktree-diff-pane {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+.workspace-git-pane {
+  min-width: 0;
 }
 
-.worktree-diff-header {
+.git-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-}
-
-.worktree-review {
-  display: grid;
-  min-height: 460px;
-  grid-template-columns: 260px minmax(0, 1fr);
-  overflow: hidden;
-  border: 1px solid rgb(var(--v-theme-outline), 0.14);
-  border-radius: 12px;
-  background: rgb(var(--v-theme-surface));
-}
-
-.worktree-file-list {
-  max-height: 620px;
-  overflow-y: auto;
-  border-right: 1px solid rgb(var(--v-theme-outline), 0.12);
-  background: rgb(var(--v-theme-surface-variant), 0.22);
-}
-
-.worktree-file-row {
-  display: grid;
-  width: 100%;
-  min-height: 52px;
-  grid-template-columns: 24px minmax(0, 1fr) auto 18px;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border: 0;
+  padding: 12px 16px;
   border-bottom: 1px solid rgb(var(--v-theme-outline), 0.08);
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
 }
 
-.worktree-file-row:hover {
-  background: rgb(var(--v-theme-on-surface), 0.035);
-}
-
-.worktree-file-row.active {
-  background: rgb(var(--v-theme-primary), 0.09);
-}
-
-.worktree-file-row.applied:not(.active) {
-  opacity: 0.66;
-}
-
-.worktree-file-row.conflict:not(.active) {
-  background: rgb(var(--v-theme-warning), 0.055);
-}
-
-.worktree-file-row.conflict.active {
-  background: rgb(var(--v-theme-warning), 0.11);
-}
-
-.worktree-file-conflict {
-  color: rgb(var(--v-theme-warning));
-}
-
-.worktree-file-status {
-  display: inline-grid;
-  width: 22px;
-  height: 22px;
-  place-items: center;
-  border-radius: 6px;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.worktree-file-status.status-added {
-  background: rgb(var(--v-theme-success), 0.12);
-  color: rgb(var(--v-theme-success));
-}
-
-.worktree-file-status.status-deleted {
-  background: rgb(var(--v-theme-error), 0.12);
-  color: rgb(var(--v-theme-error));
-}
-
-.worktree-file-status.status-modified,
-.worktree-file-status.status-type-changed {
-  background: rgb(var(--v-theme-primary), 0.11);
-  color: rgb(var(--v-theme-primary));
-}
-
-.worktree-file-main {
+.git-facts {
   display: flex;
-  flex-direction: column;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 18px;
 }
 
-.worktree-file-name {
+.git-facts > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.git-facts span {
+  color: rgb(var(--v-theme-on-surface), 0.48);
+  font-size: 10px;
+}
+
+.git-facts strong {
+  max-width: 240px;
   overflow: hidden;
   font-size: 12px;
   font-weight: 650;
@@ -901,55 +799,172 @@ body {
   white-space: nowrap;
 }
 
-.worktree-file-directory {
+.git-toolbar-actions,
+.git-section-actions,
+.git-file-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.git-section-header {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgb(var(--v-theme-outline), 0.08);
+}
+
+.git-section-header > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.git-section-header span {
+  color: rgb(var(--v-theme-on-surface), 0.45);
+  font-size: 11px;
+}
+
+.git-workbench {
+  display: grid;
+  min-height: 460px;
+  grid-template-columns: minmax(260px, 0.62fr) minmax(0, 1.38fr);
+  border-bottom: 1px solid rgb(var(--v-theme-outline), 0.08);
+}
+
+.git-change-list {
+  max-height: 560px;
+  overflow-y: auto;
+  border-right: 1px solid rgb(var(--v-theme-outline), 0.08);
+}
+
+.git-change-list .v-list-item-title,
+.git-change-list .v-list-item-subtitle {
   overflow: hidden;
-  color: rgb(var(--v-theme-on-surface), 0.43);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 10px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.worktree-file-stats {
-  display: flex;
-  gap: 5px;
-  color: rgb(var(--v-theme-on-surface), 0.46);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 10px;
-  white-space: nowrap;
+.git-change-code {
+  display: inline-block;
+  width: 30px;
+  color: rgb(var(--v-theme-primary));
+  font-size: 11px;
+  font-weight: 700;
 }
 
-.worktree-file-applied {
-  color: rgb(var(--v-theme-success));
-}
-
-.diff-addition {
-  color: rgb(var(--v-theme-success));
-}
-
-.diff-deletion {
-  color: rgb(var(--v-theme-error));
-}
-
-.worktree-file-diff {
+.git-diff-pane {
   min-width: 0;
   overflow: hidden;
 }
 
-.worktree-file-diff-header {
+.git-file-toolbar {
   display: flex;
-  min-height: 58px;
+  min-height: 44px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 9px 12px;
-  border-bottom: 1px solid rgb(var(--v-theme-outline), 0.1);
+  padding: 7px 12px;
+  border-bottom: 1px solid rgb(var(--v-theme-outline), 0.08);
 }
 
-.worktree-file-diff-path {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+.git-selected-path {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-commit-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgb(var(--v-theme-outline), 0.08);
+}
+
+.git-history {
+  min-width: 0;
+}
+
+.git-history .v-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.git-commit-hash {
+  display: inline-block;
+  width: 72px;
+  color: rgb(var(--v-theme-on-surface), 0.5);
+  font-size: 10px;
+}
+
+.git-new-branch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.workspace-skills-pane {
+  padding: 14px;
+}
+
+.workspace-skill-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.workspace-skill-card {
+  min-width: 0;
+  padding: 14px 15px;
+  border: 1px solid rgb(var(--v-theme-outline), 0.12);
+  border-radius: 12px;
+  background: rgb(var(--v-theme-surface));
+}
+
+.workspace-skill-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workspace-skill-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-skill-title strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-skill-description {
+  margin-top: 9px;
+  color: rgb(var(--v-theme-on-surface), 0.72);
   font-size: 12px;
-  font-weight: 650;
+  line-height: 1.55;
+}
+
+.workspace-skill-path {
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+  color: rgb(var(--v-theme-on-surface), 0.45);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
 }
 
 .git-diff-viewer {
@@ -1428,25 +1443,18 @@ body {
     padding: 12px 14px;
   }
 
-  .workspace-summary {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px 18px;
-    overflow: visible;
-  }
-
-  .summary-item {
-    min-width: 0;
-  }
-
-  .summary-item strong {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .workspace-files-layout {
     grid-template-columns: 1fr;
+  }
+
+  .git-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .git-change-list {
+    max-height: 260px;
+    border-right: 0;
+    border-bottom: 1px solid rgb(var(--v-theme-outline), 0.08);
   }
 
   .workspace-file-list {
@@ -1518,11 +1526,6 @@ body {
     flex: 0 0 auto;
   }
 
-  .workspace-header-chips {
-    overflow-x: auto;
-    padding-bottom: 2px;
-  }
-
   .workspace-switcher {
     width: 100%;
     flex-basis: auto;
@@ -1533,42 +1536,25 @@ body {
     flex-direction: column;
   }
 
-  .workspace-context-switcher {
-    width: 100%;
-    flex-basis: auto;
-  }
-
-  .workspace-summary {
-    padding: 12px 16px;
-  }
-
-  .worktree-diff-header {
+  .git-toolbar {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .worktree-diff-header .v-btn {
-    width: 100%;
+  .git-toolbar-actions,
+  .git-section-actions,
+  .git-file-actions {
+    flex-wrap: wrap;
   }
 
-  .worktree-review {
+  .git-file-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .git-commit-bar,
+  .git-new-branch {
     grid-template-columns: 1fr;
-  }
-
-  .worktree-file-list {
-    max-height: 220px;
-    border-right: 0;
-    border-bottom: 1px solid rgb(var(--v-theme-outline), 0.12);
-  }
-
-  .worktree-file-diff-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .worktree-file-diff-header .v-btn,
-  .worktree-file-diff-header .v-chip {
-    align-self: flex-start;
   }
 
   .git-diff-viewer {
@@ -1728,11 +1714,6 @@ body {
 
   .panel-subtitle {
     display: none;
-  }
-
-  .workspace-summary {
-    grid-template-columns: 1fr 1fr;
-    gap: 10px 14px;
   }
 
   .operation-col-time {
