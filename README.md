@@ -8,7 +8,7 @@
   English | <a href="./docs/README.zh-CN.md">简体中文</a> | <a href="https://doc.chatroomcp.com/">Documentation</a>
 </p>
 
-ChatRoom is a local MCP runtime that lets ChatGPT work with projects and processes on your device. Its WebUI provides workspace browsing, Git repository management, process monitoring, ChatRoom Cloud controls, and plugin-attributed operation logs.
+ChatRoom is a local MCP runtime that lets ChatGPT work with projects on your local device, run processes, or perform computer control. Its WebUI provides workspace browsing, Git repository and process management, computer control, ChatRoom Cloud management, and plugin-attributed operation logs.
 
 ## Install
 
@@ -20,6 +20,8 @@ chatroom init
 chatroom serve
 ```
 
+Windows users can also use [ChatRoom-Windows-Portable](https://github.com/dayearnew/ChatRoom-Windows-Portable) without configuring any dependencies themselves.
+
 Default local endpoints:
 
 ```text
@@ -27,13 +29,13 @@ WebUI  http://127.0.0.1:8765/
 MCP    http://127.0.0.1:8765/mcp
 ```
 
-`chatroom init` creates `~/.config/chatroom/config.json` and uses `~/Projects` as the default allowed workspace root.
+`chatroom init` creates the [configuration file](https://doc.chatroomcp.com/configuration) and uses `~/Projects` as the default allowed workspace root.
 
 ## Use with ChatGPT
 
 ChatGPT connects to ChatRoom through its MCP endpoint. For remote access, either enable ChatRoom Cloud from the WebUI or expose ChatRoom through your own HTTPS ingress and configure the corresponding public URL.
 
-Create a custom MCP app in ChatGPT Developer Mode, use the ChatRoom `/mcp` URL, and complete OAuth authorization with the `ownerToken` stored in `~/.config/chatroom/config.json`.
+Create a custom MCP app in ChatGPT Developer Mode, use the ChatRoom `/mcp` URL, and complete OAuth authorization with the `ownerToken` in the [configuration file](https://doc.chatroomcp.com/configuration).
 
 See [Use ChatRoom with ChatGPT](https://doc.chatroomcp.com/chatgpt) for the current ChatGPT setup flow.
 
