@@ -1,5 +1,7 @@
 export interface WorkspaceEntry {
   root: string;
+  name: string;
+  summary: string | null;
 }
 
 export interface WorkspaceSkill {
@@ -10,6 +12,9 @@ export interface WorkspaceSkill {
 
 export interface WorkspaceInfo {
   root: string;
+  name: string;
+  summary: string | null;
+  presetPrompt: string | null;
   instructions: string | null;
   skills: WorkspaceSkill[];
 }

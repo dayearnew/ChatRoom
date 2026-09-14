@@ -6,6 +6,8 @@ import {
 } from "../../../presentation/http/http-utils.js";
 import type { WebRuntime } from "../runtime.js";
 
+const MAX_WRITE_BYTES = 1024 * 1024;
+
 export function createWorkspaceApiRouter(application: WebRuntime): Router {
   const router = Router();
 
@@ -15,6 +17,30 @@ export function createWorkspaceApiRouter(application: WebRuntime): Router {
       res.json(await application.workspaces.list());
     }),
   );
+
+  router.post(
+    "/workspaces",
+    asyncRoute(async (req, res) => {
+      const body = bodyRecord(req.body);
+      const parent = requireString(body.parent, "parent");
+      const name = requireString(body.name, "name");
+      res.json(
+        await application.operations.run(
+          {
+            pluginId: "workspace",
+            source: "gui",
+            action: "create",
+            input: { parent, name },
+          },
+          () => application.workspaces.createProject(parent, name),
+        ),
+      );
+    }),
+  );
+
+  router.get("/workspace/roots", (_req, res) => {
+    res.json(application.workspaces.roots());
+  });
 
   router.get(
     "/workspace",
@@ -55,6 +81,36 @@ export function createWorkspaceApiRouter(application: WebRuntime): Router {
     }),
   );
 
+  router.put(
+    "/workspace/file",
+    asyncRoute(async (req, res) => {
+      const body = bodyRecord(req.body);
+      const fs = await application.workspaces.fs(
+        requireString(body.root, "root"),
+      );
+      const filePath = requireString(body.path, "path");
+      if (typeof body.content !== "string")
+        throw new ChatRoomError("INVALID_INPUT", "content must be a string");
+      const bytes = Buffer.byteLength(body.content, "utf8");
+      if (bytes > MAX_WRITE_BYTES)
+        throw new ChatRoomError(
+          "INVALID_INPUT",
+          `File content exceeds ${MAX_WRITE_BYTES} bytes`,
+        );
+      res.json(
+        await application.operations.run(
+          {
+            pluginId: "workspace",
+            source: "gui",
+            action: "file.write",
+            input: { root: fs.root, path: filePath, bytes },
+          },
+          () => fs.write(filePath, body.content as string),
+        ),
+      );
+    }),
+  );
+
   router.get(
     "/workspace/file/image",
     asyncRoute(async (req, res) => {
@@ -83,6 +139,12 @@ export function createWorkspaceApiRouter(application: WebRuntime): Router {
   );
 
   return router;
+}
+
+function bodyRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function imageMime(filePath: string): string | null {

@@ -1749,3 +1749,38 @@ body {
     padding-left: 12px;
   }
 }
+
+.workspace-prompt-pane {
+  min-width: 0;
+}
+
+.workspace-prompt-form {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+}
+
+.workspace-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.workspace-create-form {
+  display: grid;
+  gap: 18px;
+}
+
+.workspace-create-location {
+  display: grid;
+  gap: 4px;
+}
+
+.workspace-create-location span {
+  color: rgb(var(--v-theme-on-surface), 0.55);
+  font-size: 12px;
+}
+
+.workspace-create-location code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}

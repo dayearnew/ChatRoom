@@ -2,20 +2,25 @@
 import { onMounted, ref, watch } from "vue";
 import { useLocale } from "vuetify";
 import { api, type WorkspaceEntry } from "../api.js";
-import { basename } from "../utils.js";
+import WorkspaceCreateDialog from "./WorkspaceCreateDialog.vue";
 import WorkspaceFilesPane from "./WorkspaceFilesPane.vue";
 import WorkspaceGitPane from "./WorkspaceGitPane.vue";
+import WorkspacePromptPane from "./WorkspacePromptPane.vue";
 import WorkspaceSkillsPane from "./WorkspaceSkillsPane.vue";
 
 defineProps<{ revision: number }>();
 
 const items = ref<WorkspaceEntry[]>([]);
+const allowedRoots = ref<string[]>([]);
 const selectedRoot = ref<string | null>(
   window.localStorage.getItem("chatroom.workspace.root"),
 );
 const tab = ref("git");
 const loading = ref(false);
 const error = ref("");
+const createOpen = ref(false);
+const creating = ref(false);
+const createError = ref("");
 const locale = useLocale();
 
 onMounted(() => void load());
@@ -28,13 +33,36 @@ async function load() {
   loading.value = true;
   error.value = "";
   try {
-    items.value = await api<WorkspaceEntry[]>("/workspaces");
+    const [workspaces, roots] = await Promise.all([
+      api<WorkspaceEntry[]>("/workspaces"),
+      api<string[]>("/workspace/roots"),
+    ]);
+    items.value = workspaces;
+    allowedRoots.value = roots;
     if (!items.value.some((item) => item.root === selectedRoot.value))
       selectedRoot.value = items.value[0]?.root ?? null;
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : String(cause);
   } finally {
     loading.value = false;
+  }
+}
+
+async function createProject(parent: string, name: string) {
+  creating.value = true;
+  createError.value = "";
+  try {
+    const created = await api<WorkspaceEntry>("/workspaces", {
+      method: "POST",
+      body: JSON.stringify({ parent, name }),
+    });
+    await load();
+    selectedRoot.value = created.root;
+    createOpen.value = false;
+  } catch (cause) {
+    createError.value = cause instanceof Error ? cause.message : String(cause);
+  } finally {
+    creating.value = false;
   }
 }
 </script>
@@ -48,10 +76,7 @@ async function load() {
             <v-select
               v-model="selectedRoot"
               :items="
-                items.map((item) => ({
-                  title: basename(item.root),
-                  value: item.root,
-                }))
+                items.map((item) => ({ title: item.name, value: item.root }))
               "
               :loading="loading"
               density="compact"
@@ -59,6 +84,16 @@ async function load() {
               hide-details
               prepend-inner-icon="mdi-folder-outline"
               class="workspace-switcher"
+            />
+            <v-btn
+              icon="mdi-plus"
+              size="small"
+              variant="text"
+              :aria-label="locale.t('$vuetify.chatroom.workspaces.createTitle')"
+              @click="
+                createError = '';
+                createOpen = true;
+              "
             />
             <v-btn
               icon="mdi-refresh"
@@ -81,6 +116,9 @@ async function load() {
       <template v-if="selectedRoot">
         <v-tabs v-model="tab" density="compact" class="workspace-tabs">
           <v-tab value="git">Git</v-tab>
+          <v-tab value="prompt">{{
+            locale.t("$vuetify.chatroom.workspaces.prompt")
+          }}</v-tab>
           <v-tab value="files">{{
             locale.t("$vuetify.chatroom.workspaces.files")
           }}</v-tab>
@@ -93,6 +131,9 @@ async function load() {
         <v-window v-model="tab">
           <v-window-item value="git">
             <WorkspaceGitPane :root="selectedRoot" />
+          </v-window-item>
+          <v-window-item value="prompt">
+            <WorkspacePromptPane :root="selectedRoot" />
           </v-window-item>
           <v-window-item value="files">
             <WorkspaceFilesPane :root="selectedRoot" />
@@ -109,5 +150,13 @@ async function load() {
         :title="locale.t('$vuetify.chatroom.workspaces.empty')"
       />
     </v-card>
+
+    <WorkspaceCreateDialog
+      v-model="createOpen"
+      :roots="allowedRoots"
+      :busy="creating"
+      :error="createError"
+      @create="createProject"
+    />
   </div>
 </template>

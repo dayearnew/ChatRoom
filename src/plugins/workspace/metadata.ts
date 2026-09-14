@@ -5,18 +5,18 @@ import type { WorkspaceSkill } from "./types.js";
 
 const SKILL_ROOTS = [".agents/skills", ".claude/skills", ".chatroom/skills"];
 const MAX_METADATA_BYTES = 64 * 1024;
+const MAX_SUMMARY_BYTES = 8 * 1024;
 
-export async function readInstructions(
-  fs: WorkspaceFs,
-): Promise<string | null> {
-  try {
-    return (await fs.read("AGENTS.md", { maxBytes: MAX_METADATA_BYTES }))
-      .content;
-  } catch (error) {
-    if (error instanceof ChatRoomError && error.code === "NOT_FOUND")
-      return null;
-    throw error;
-  }
+export function readSummary(fs: WorkspaceFs): Promise<string | null> {
+  return readOptionalText(fs, ".chatroom/summary.md", MAX_SUMMARY_BYTES);
+}
+
+export function readPresetPrompt(fs: WorkspaceFs): Promise<string | null> {
+  return readOptionalText(fs, ".chatroom/prompt.md", MAX_METADATA_BYTES);
+}
+
+export function readInstructions(fs: WorkspaceFs): Promise<string | null> {
+  return readOptionalText(fs, "AGENTS.md", MAX_METADATA_BYTES);
 }
 
 export async function readSkills(fs: WorkspaceFs): Promise<WorkspaceSkill[]> {
@@ -55,6 +55,21 @@ export async function readSkills(fs: WorkspaceFs): Promise<WorkspaceSkill[]> {
       }
     }),
   );
+}
+
+async function readOptionalText(
+  fs: WorkspaceFs,
+  relativePath: string,
+  maxBytes: number,
+): Promise<string | null> {
+  try {
+    const content = (await fs.read(relativePath, { maxBytes })).content;
+    return content.trim() ? content : null;
+  } catch (error) {
+    if (error instanceof ChatRoomError && error.code === "NOT_FOUND")
+      return null;
+    throw error;
+  }
 }
 
 function parseSkillFrontmatter(content: string): {

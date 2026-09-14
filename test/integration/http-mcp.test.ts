@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import { readFileSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
 import {
   Client,
@@ -21,6 +23,59 @@ test("HTTP API and real MCP client share the same Application runtime", async ()
       JSON.parse(readFileSync("package.json", "utf8")) as { version: string }
     ).version;
 
+    const metadataWrites = await Promise.all(
+      [
+        [".chatroom/summary.md", "ChatRoom integration workspace"],
+        [".chatroom/prompt.md", "Prefer minimal workspace changes."],
+      ].map(([filePath, content]) =>
+        fetch(`${base}/api/workspace/file`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            root: runtime.workspaceRoot,
+            path: filePath,
+            content,
+          }),
+        }),
+      ),
+    );
+    for (const response of metadataWrites) assert.equal(response.status, 200);
+
+    const workspaceListResponse = await fetch(`${base}/api/workspaces`);
+    assert.equal(workspaceListResponse.status, 200);
+    const workspaceList = (await workspaceListResponse.json()) as Array<{
+      root: string;
+      name: string;
+      summary: string | null;
+    }>;
+    assert.deepEqual(
+      workspaceList.find((item) => item.root === runtime.workspaceRoot),
+      {
+        root: runtime.workspaceRoot,
+        name: path.basename(runtime.workspaceRoot),
+        summary: "ChatRoom integration workspace",
+      },
+    );
+
+    const createResponse = await fetch(`${base}/api/workspaces`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ parent: runtime.root, name: "created-project" }),
+    });
+    assert.equal(createResponse.status, 200);
+    const createdWorkspace = (await createResponse.json()) as { root: string };
+    assert.equal(
+      createdWorkspace.root,
+      path.join(runtime.root, "created-project"),
+    );
+
+    const nested = path.join(runtime.workspaceRoot, "nested");
+    await mkdir(nested);
+    const nestedInfoResponse = await fetch(
+      `${base}/api/workspace?root=${encodeURIComponent(nested)}`,
+    );
+    assert.equal(nestedInfoResponse.status, 403);
+
     client = new Client({
       name: "chatroom-integration-test",
       version: "1.0.0",
@@ -37,9 +92,16 @@ test("HTTP API and real MCP client share the same Application runtime", async ()
       arguments: { root: runtime.workspaceRoot },
     });
     assert.equal(workspace.isError, undefined);
+    const workspaceInfo = workspace.structuredContent as {
+      root: string;
+      summary: string | null;
+      presetPrompt: string | null;
+    };
+    assert.equal(workspaceInfo.root, runtime.workspaceRoot);
+    assert.equal(workspaceInfo.summary, "ChatRoom integration workspace");
     assert.equal(
-      (workspace.structuredContent as { root: string }).root,
-      runtime.workspaceRoot,
+      workspaceInfo.presetPrompt,
+      "Prefer minimal workspace changes.",
     );
     const startedProcess = await client.callTool({
       name: "process_start",

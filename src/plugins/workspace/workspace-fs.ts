@@ -1,4 +1,15 @@
-import { lstat, open, readdir, realpath, stat } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import {
+  lstat,
+  mkdir,
+  open,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import { ChatRoomError } from "../../core/errors/chatroom-error.js";
 import type { WorkspaceFile } from "./types.js";
@@ -58,6 +69,45 @@ export class WorkspaceFs {
     }
   }
 
+  async write(relativePath: string, content: string): Promise<WorkspaceFile> {
+    if (typeof content !== "string")
+      throw new ChatRoomError("INVALID_INPUT", "File content must be a string");
+
+    const normalized = normalizeRelative(relativePath);
+    if (normalized === ".")
+      throw new ChatRoomError("INVALID_INPUT", "File path is required");
+
+    const target = await this.resolveWritable(normalized);
+    let mode = 0o644;
+    try {
+      const info = await lstat(target);
+      if (!info.isFile())
+        throw new ChatRoomError("INVALID_INPUT", `Not a file: ${relativePath}`);
+      mode = info.mode & 0o777;
+    } catch (error) {
+      if (error instanceof ChatRoomError) throw error;
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+
+    const temporary = `${target}.chatroom-${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporary, content, {
+        encoding: "utf8",
+        flag: "wx",
+        mode,
+      });
+      await rename(temporary, target);
+    } finally {
+      await rm(temporary, { force: true }).catch(() => undefined);
+    }
+
+    return {
+      path: normalized,
+      type: "file",
+      size: Buffer.byteLength(content, "utf8"),
+    };
+  }
+
   async list(
     relativePath = ".",
     options: { recursive?: boolean; maxEntries?: number } = {},
@@ -94,11 +144,69 @@ export class WorkspaceFs {
     return output;
   }
 
-  private async resolveReadable(relativePath: string): Promise<string> {
+  private lexical(relativePath: string): string {
     const normalized = normalizeRelative(relativePath);
-    const lexical = path.resolve(this.root, ...normalized.split("/"));
-    if (!inside(this.root, lexical))
+    const absolute = path.resolve(this.root, ...normalized.split("/"));
+    if (!inside(this.root, absolute))
       throw new ChatRoomError("FORBIDDEN", "Path escapes workspace");
+    return absolute;
+  }
+
+  private async resolveWritable(relativePath: string): Promise<string> {
+    const target = this.lexical(relativePath);
+    const relative = path.relative(this.root, target);
+    const parts = relative.split(path.sep).filter(Boolean);
+    let current = this.root;
+
+    for (let index = 0; index < parts.length - 1; index++) {
+      current = path.join(current, parts[index]!);
+      let info;
+      try {
+        info = await lstat(current);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        try {
+          await mkdir(current, { recursive: false, mode: 0o700 });
+        } catch (mkdirError) {
+          if ((mkdirError as NodeJS.ErrnoException).code !== "EEXIST")
+            throw mkdirError;
+        }
+        info = await lstat(current);
+      }
+
+      if (info.isSymbolicLink())
+        throw new ChatRoomError(
+          "FORBIDDEN",
+          `Writes through symlinked directories are not allowed: ${relativePath}`,
+        );
+      if (!info.isDirectory())
+        throw new ChatRoomError(
+          "INVALID_INPUT",
+          `Parent is not a directory: ${parts[index]}`,
+        );
+      const canonical = await realpath(current);
+      if (!inside(this.root, canonical))
+        throw new ChatRoomError("FORBIDDEN", "Write path escapes workspace");
+    }
+
+    try {
+      const targetInfo = await lstat(target);
+      if (targetInfo.isSymbolicLink())
+        throw new ChatRoomError(
+          "FORBIDDEN",
+          `Writes through symlinks are not allowed: ${relativePath}`,
+        );
+      if (!targetInfo.isFile())
+        throw new ChatRoomError("INVALID_INPUT", `Not a file: ${relativePath}`);
+    } catch (error) {
+      if (error instanceof ChatRoomError) throw error;
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    return target;
+  }
+
+  private async resolveReadable(relativePath: string): Promise<string> {
+    const lexical = this.lexical(relativePath);
     const canonical = await realpath(lexical).catch((error) => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT")
         throw new ChatRoomError(

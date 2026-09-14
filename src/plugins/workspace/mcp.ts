@@ -5,6 +5,9 @@ import type { WorkspaceService } from "./workspace-service.js";
 
 const workspaceInfoSchema = z.object({
   root: z.string(),
+  name: z.string(),
+  summary: z.string().nullable(),
+  presetPrompt: z.string().nullable(),
   instructions: z.string().nullable(),
   skills: z.array(
     z.object({
@@ -24,7 +27,7 @@ export function registerWorkspaceTools(
     {
       title: "Workspace info",
       description:
-        "Read project instructions and skill metadata for a directory within the configured allowed roots.",
+        "Read the complete workspace context for a project, including its summary, preset prompt, project instructions, and skill metadata.",
       inputSchema: z.object({ root: z.string() }),
       outputSchema: workspaceInfoSchema,
       annotations: closedRead,
