@@ -9,7 +9,10 @@ import {
 import { clock, duration } from "../utils.js";
 import StateChip from "./StateChip.vue";
 
-defineProps<{ events: Operation[]; selected?: string | null }>();
+defineProps<{
+  events: Operation[];
+  selected?: string | null;
+}>();
 defineEmits<{ select: [event: Operation] }>();
 const locale = useLocale();
 
@@ -25,55 +28,34 @@ function sourceLabel(source: string): string {
 </script>
 
 <template>
-  <div v-if="events.length" class="table-shell">
-    <v-table density="comfortable" hover class="operation-table">
-      <thead>
-        <tr>
-          <th class="operation-col-time">
-            {{ locale.t("$vuetify.chatroom.table.time") }}
-          </th>
-          <th>{{ locale.t("$vuetify.chatroom.table.action") }}</th>
-          <th>{{ locale.t("$vuetify.chatroom.table.plugin") }}</th>
-          <th class="operation-col-source">
-            {{ locale.t("$vuetify.chatroom.table.source") }}
-          </th>
-          <th class="operation-col-status">
-            {{ locale.t("$vuetify.chatroom.table.status") }}
-          </th>
-          <th class="operation-col-duration text-right">
-            {{ locale.t("$vuetify.chatroom.table.duration") }}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="event in events"
-          :key="event.operationId"
-          class="clickable"
-          :class="{ 'selected-row': selected === event.operationId }"
-          @click="$emit('select', event)"
-        >
-          <td class="operation-col-time mono text-caption">
-            {{ clock(event.startedAt) }}
-          </td>
-          <td class="font-weight-medium">{{ actionLabel(event.action) }}</td>
-          <td class="text-body-2 mono">{{ event.pluginId }}</td>
-          <td class="operation-col-source text-body-2 muted">
-            {{ sourceLabel(event.source) }}
-          </td>
-          <td class="operation-col-status">
-            <StateChip :value="event.status" />
-          </td>
-          <td class="operation-col-duration text-right text-body-2">
-            {{
-              event.durationMs === null
-                ? locale.t("$vuetify.chatroom.statuses.running")
-                : duration(event.durationMs)
-            }}
-          </td>
-        </tr>
-      </tbody>
-    </v-table>
+  <div v-if="events.length" class="responsive-record-list">
+    <button
+      v-for="event in events"
+      :key="event.operationId"
+      type="button"
+      class="responsive-record-row"
+      :class="{ 'selected-row': selected === event.operationId }"
+      @click="$emit('select', event)"
+    >
+      <div class="responsive-record-main">
+        <div class="responsive-record-title">
+          {{ actionLabel(event.action) }}
+        </div>
+        <div class="responsive-record-subtitle mono">{{ event.pluginId }}</div>
+      </div>
+      <div class="responsive-record-meta">
+        <span>{{ clock(event.startedAt) }}</span>
+        <span>{{ sourceLabel(event.source) }}</span>
+        <span>{{
+          event.durationMs === null
+            ? locale.t("$vuetify.chatroom.statuses.running")
+            : duration(event.durationMs)
+        }}</span>
+      </div>
+      <div class="responsive-record-side">
+        <StateChip :value="event.status" />
+      </div>
+    </button>
   </div>
   <div v-else class="empty-inline">
     {{ locale.t("$vuetify.chatroom.operations.empty") }}

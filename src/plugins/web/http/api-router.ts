@@ -112,6 +112,20 @@ export function createApiRouter(
 
   router.use(apiAuthentication(auth, ingress));
   router.get("/runtime", (_req, res) => res.json(runtimeStatus()));
+  router.get("/mcp/tools", (_req, res) => {
+    res.json(application.mcpTools.list());
+  });
+  router.patch("/mcp/tools/:toolName", (req, res) => {
+    const body = req.body as Record<string, unknown>;
+    if (typeof body.enabled !== "boolean")
+      throw new ChatRoomError("INVALID_INPUT", "enabled must be a boolean");
+    res.json(
+      application.mcpTools.setEnabled(
+        requireString(req.params.toolName, "toolName"),
+        body.enabled,
+      ),
+    );
+  });
   router.get("/auth/passkeys", (_req, res) => res.json(passkeys.list()));
   router.post(
     "/auth/passkeys/register/options",

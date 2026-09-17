@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { useLocale } from "vuetify";
+import { computed, nextTick, ref, watch } from "vue";
+import { useDisplay, useLocale } from "vuetify";
 import { api, type ProcessSnapshot } from "../api.js";
 import { appIntlLocale } from "../locales.js";
-import { duration } from "../utils.js";
+import { dateTime, duration } from "../utils.js";
 import CodeViewer from "./CodeViewer.vue";
 import StateChip from "./StateChip.vue";
 
@@ -12,6 +12,16 @@ const items = ref<ProcessSnapshot[]>([]);
 const selected = ref<string | null>(null);
 const detail = ref<ProcessSnapshot | null>(null);
 const locale = useLocale();
+const display = useDisplay();
+const compact = computed(() => display.width.value <= 1100);
+const layout = ref<HTMLElement | null>(null);
+const processOutput = computed(() => {
+  if (!detail.value) return "";
+  const stderr = detail.value.stderr
+    ? `\n\n[stderr]\n${detail.value.stderr}`
+    : "";
+  return `${detail.value.stdout}${stderr}`;
+});
 const fullCommand = computed(() =>
   detail.value
     ? [detail.value.command, ...detail.value.args]
@@ -45,6 +55,20 @@ async function loadDetail() {
     : null;
 }
 
+function selectProcess(processId: string) {
+  selected.value = processId;
+  if (compact.value) {
+    void nextTick(() =>
+      layout.value?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }
+}
+
+function backToProcesses() {
+  selected.value = null;
+  detail.value = null;
+}
+
 async function stop(id: string, force: boolean) {
   await api(`/processes/${id}/${force ? "kill" : "terminate"}`, {
     method: "POST",
@@ -54,8 +78,8 @@ async function stop(id: string, force: boolean) {
 </script>
 
 <template>
-  <div class="master-detail-layout processes-layout">
-    <div class="master-pane">
+  <div ref="layout" class="master-detail-layout processes-layout">
+    <div v-if="!compact || !selected" class="master-pane">
       <v-card class="panel-card">
         <div class="panel-header">
           <div>
@@ -69,101 +93,92 @@ async function stop(id: string, force: boolean) {
         </div>
         <v-divider />
 
-        <div v-if="items.length" class="table-shell">
-          <v-table density="comfortable" hover class="process-table">
-            <thead>
-              <tr>
-                <th class="process-col-command">
-                  {{ locale.t("$vuetify.chatroom.processes.command") }}
-                </th>
-                <th class="process-col-state">
-                  {{ locale.t("$vuetify.chatroom.processes.state") }}
-                </th>
-                <th class="process-col-started">
-                  {{ locale.t("$vuetify.chatroom.processes.started") }}
-                </th>
-                <th class="process-col-duration text-right">
-                  {{ locale.t("$vuetify.chatroom.processes.duration") }}
-                </th>
-                <th class="process-col-actions" />
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="item in items"
-                :key="item.processId"
-                class="clickable"
-                :class="{ 'selected-row': selected === item.processId }"
-                @click="selected = item.processId"
+        <div v-if="items.length" class="process-record-list">
+          <div class="process-record-header" aria-hidden="true">
+            <span>{{ locale.t("$vuetify.chatroom.processes.command") }}</span>
+            <span>{{ locale.t("$vuetify.chatroom.processes.arguments") }}</span>
+            <span>{{ locale.t("$vuetify.chatroom.processes.started") }}</span>
+            <span class="process-record-duration">{{
+              locale.t("$vuetify.chatroom.processes.duration")
+            }}</span>
+            <span class="process-record-state-heading">{{
+              locale.t("$vuetify.chatroom.processes.state")
+            }}</span>
+          </div>
+          <div
+            v-for="item in items"
+            :key="item.processId"
+            role="button"
+            tabindex="0"
+            class="process-record-row"
+            :class="{ 'selected-row': selected === item.processId }"
+            @click="selectProcess(item.processId)"
+            @keydown.enter="selectProcess(item.processId)"
+            @keydown.space.prevent="selectProcess(item.processId)"
+          >
+            <div class="process-record-main">
+              <div class="process-record-command mono" :title="item.command">
+                {{ item.command }}
+              </div>
+              <div
+                class="process-record-args mono"
+                :class="{ muted: !item.args.length }"
+                :title="item.args.join(' ')"
               >
-                <td class="process-command-cell">
-                  <div
-                    class="font-weight-medium process-command"
-                    :title="item.command"
-                  >
-                    {{ item.command }}
-                  </div>
-                  <div
-                    v-if="item.args.length"
-                    class="text-caption muted command-args"
-                    :title="item.args.join(' ')"
-                  >
-                    {{ item.args.join(" ") }}
-                  </div>
-                </td>
-                <td><StateChip :value="item.state" /></td>
-                <td class="process-col-started text-body-2">
-                  {{
-                    new Date(item.startedAt).toLocaleString(
-                      appIntlLocale(locale.current.value),
-                    )
-                  }}
-                </td>
-                <td class="process-col-duration text-right text-body-2">
-                  {{ duration(item.durationMs) }}
-                </td>
-                <td class="text-right process-actions-cell">
-                  <div
-                    v-if="item.state === 'running'"
-                    class="process-actions"
-                    @click.stop
-                  >
+                {{ item.args.length ? item.args.join(" ") : "—" }}
+              </div>
+            </div>
+            <div class="process-record-meta">
+              <div class="process-record-started">
+                {{
+                  dateTime(item.startedAt, appIntlLocale(locale.current.value))
+                }}
+              </div>
+              <div class="process-record-duration">
+                {{ duration(item.durationMs) }}
+              </div>
+            </div>
+            <div class="process-record-side">
+              <StateChip :value="item.state" />
+              <div
+                v-if="item.state === 'running'"
+                class="process-actions"
+                @click.stop
+              >
+                <v-btn
+                  icon="mdi-stop-circle-outline"
+                  size="x-small"
+                  variant="text"
+                  class="table-action-btn"
+                  :aria-label="
+                    locale.t('$vuetify.chatroom.processes.terminate')
+                  "
+                  @click="stop(item.processId, false)"
+                />
+                <v-menu>
+                  <template #activator="{ props: menuProps }">
                     <v-btn
-                      icon="mdi-stop-circle-outline"
+                      v-bind="menuProps"
+                      icon="mdi-dots-horizontal"
                       size="x-small"
                       variant="text"
                       class="table-action-btn"
                       :aria-label="
-                        locale.t('$vuetify.chatroom.processes.terminate')
+                        locale.t('$vuetify.chatroom.processes.moreActions')
                       "
-                      @click="stop(item.processId, false)"
                     />
-                    <v-menu>
-                      <template #activator="{ props: menuProps }">
-                        <v-btn
-                          v-bind="menuProps"
-                          icon="mdi-dots-horizontal"
-                          size="x-small"
-                          variant="text"
-                          class="table-action-btn"
-                          :aria-label="
-                            locale.t('$vuetify.chatroom.processes.moreActions')
-                          "
-                        />
-                      </template>
-                      <v-list density="compact">
-                        <v-list-item
-                          :title="locale.t('$vuetify.chatroom.processes.kill')"
-                          prepend-icon="mdi-close-octagon-outline"
-                          @click="stop(item.processId, true)"
-                        />
-                      </v-list>
-                    </v-menu>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
+                  </template>
+                  <v-list density="compact">
+                    <v-list-item
+                      :title="locale.t('$vuetify.chatroom.processes.kill')"
+                      prepend-icon="mdi-close-octagon-outline"
+                      @click="stop(item.processId, true)"
+                    />
+                  </v-list>
+                </v-menu>
+              </div>
+            </div>
+          </div>
         </div>
         <div v-else class="empty-inline">
           {{ locale.t("$vuetify.chatroom.processes.empty") }}
@@ -171,10 +186,18 @@ async function stop(id: string, force: boolean) {
       </v-card>
     </div>
 
-    <div class="detail-pane">
+    <div v-if="!compact || selected" class="detail-pane">
       <v-card v-if="detail" class="panel-card">
         <div class="panel-header process-detail-header">
-          <div class="min-w-0">
+          <v-btn
+            v-if="compact"
+            icon="mdi-arrow-left"
+            size="small"
+            variant="text"
+            :aria-label="locale.t('$vuetify.chatroom.processes.back')"
+            @click="backToProcesses"
+          />
+          <div class="min-w-0 detail-header-title">
             <div class="panel-title text-truncate">{{ detail.command }}</div>
             <div class="panel-subtitle mono text-truncate">
               {{ detail.processId }}
@@ -216,6 +239,10 @@ async function stop(id: string, force: boolean) {
           </div>
         </div>
         <v-divider />
+        <div class="process-output">
+          <CodeViewer :text="processOutput" filename="output.txt" />
+        </div>
+        <v-divider />
         <div class="process-full-command">
           <div class="process-full-command-label">
             {{ locale.t("$vuetify.chatroom.processes.fullCommand") }}
@@ -244,13 +271,6 @@ async function stop(id: string, force: boolean) {
                 : locale.t("$vuetify.chatroom.processes.no")
             }}</strong>
           </div>
-        </div>
-        <v-divider />
-        <div class="pa-3">
-          <CodeViewer :text="detail.stdout" filename="stdout.txt" />
-        </div>
-        <div v-if="detail.stderr" class="pa-3 pt-0">
-          <CodeViewer :text="detail.stderr" filename="stderr.txt" />
         </div>
       </v-card>
       <v-card v-else class="panel-card">

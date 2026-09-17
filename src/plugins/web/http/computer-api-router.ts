@@ -72,7 +72,12 @@ export function createComputerApiRouter(
   );
   router.get("/computer/preview", (req, res) => {
     const scope = ingress.isExternalWeb(req) ? "remote" : "local";
-    res.json(presentPreview(computer.latestSnapshot(scope)));
+    res.json(
+      presentPreview(
+        computer.latestSnapshot(scope),
+        computer.latestSnapshotTimestamp(),
+      ),
+    );
   });
   router.post(
     "/computer/snapshot",
@@ -82,17 +87,21 @@ export function createComputerApiRouter(
         includeScreenshot: true,
         includeElements: true,
       });
-      res.json(presentPreview(value));
+      res.json(presentPreview(value, computer.latestSnapshotTimestamp()));
     }),
   );
   return router;
 }
 
-function presentPreview(value: ReturnType<ComputerService["latestSnapshot"]>) {
+function presentPreview(
+  value: ReturnType<ComputerService["latestSnapshot"]>,
+  capturedAt: string | null,
+) {
   if (!value) return null;
   return {
     snapshotId: value.snapshotId,
     revision: value.revision,
+    capturedAt,
     display: value.display,
     activeApp: value.activeApp,
     activeWindow: value.activeWindow,

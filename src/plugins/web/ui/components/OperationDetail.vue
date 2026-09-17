@@ -8,10 +8,12 @@ import {
   humanizeAction,
   sourceMessageKey,
 } from "../locales.js";
+import { dateTime } from "../utils.js";
 import CodeViewer from "./CodeViewer.vue";
 import StateChip from "./StateChip.vue";
 
-defineProps<{ event: Operation | null }>();
+defineProps<{ event: Operation | null; showBack?: boolean }>();
+defineEmits<{ back: [] }>();
 const tab = ref("input");
 const locale = useLocale();
 
@@ -41,18 +43,22 @@ function terminalText(value: unknown): string | null {
 
 <template>
   <v-card v-if="event" class="panel-card">
-    <div class="panel-header">
-      <div class="min-w-0">
+    <div class="panel-header operation-detail-header">
+      <v-btn
+        v-if="showBack"
+        icon="mdi-arrow-left"
+        size="small"
+        variant="text"
+        :aria-label="locale.t('$vuetify.chatroom.operations.back')"
+        @click="$emit('back')"
+      />
+      <div class="min-w-0 detail-header-title">
         <div class="panel-title text-truncate">
           {{ actionLabel(event.action) }}
         </div>
         <div class="panel-subtitle">
           {{ sourceLabel(event.source) }} ·
-          {{
-            new Date(event.startedAt).toLocaleString(
-              appIntlLocale(locale.current.value),
-            )
-          }}
+          {{ dateTime(event.startedAt, appIntlLocale(locale.current.value)) }}
         </div>
       </div>
       <StateChip :value="event.status" />

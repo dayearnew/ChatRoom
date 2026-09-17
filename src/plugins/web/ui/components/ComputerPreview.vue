@@ -2,6 +2,8 @@
 import { computed } from "vue";
 import { useLocale } from "vuetify";
 import type { ComputerPreviewView } from "../api.js";
+import { appIntlLocale } from "../locales.js";
+import { dateTime } from "../utils.js";
 
 const props = defineProps<{
   preview: ComputerPreviewView | null;
@@ -18,13 +20,24 @@ const screenshotUrl = computed(() => {
     ? `data:${screenshot.mimeType};base64,${screenshot.data}`
     : "";
 });
+
+const capturedAt = computed(() => {
+  const value = props.preview?.capturedAt;
+  if (!value) return "";
+  return dateTime(value, appIntlLocale(locale.current.value));
+});
 </script>
 
 <template>
   <v-card rounded="xl" variant="flat" border class="panel-card">
     <div class="panel-header compact-header">
-      <div class="panel-title">
-        {{ locale.t("$vuetify.chatroom.computer.latestScreen") }}
+      <div class="computer-preview-heading">
+        <div class="panel-title">
+          {{ locale.t("$vuetify.chatroom.computer.latestScreen") }}
+        </div>
+        <div v-if="capturedAt" class="computer-preview-time">
+          {{ locale.t("$vuetify.chatroom.computer.capturedAt", capturedAt) }}
+        </div>
       </div>
       <v-btn
         size="small"
@@ -79,6 +92,16 @@ const screenshotUrl = computed(() => {
 </template>
 
 <style scoped>
+.computer-preview-heading {
+  min-width: 0;
+}
+
+.computer-preview-time {
+  margin-top: 2px;
+  color: rgb(var(--v-theme-on-surface), 0.52);
+  font-size: 11px;
+}
+
 .computer-preview-content {
   padding: 14px;
 }

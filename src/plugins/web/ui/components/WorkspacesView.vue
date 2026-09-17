@@ -72,39 +72,48 @@ async function createProject(parent: string, name: string) {
     <v-card class="workspace-detail panel-card">
       <div class="workspace-header">
         <div class="workspace-identity min-w-0">
-          <div class="workspace-selector-row">
-            <v-select
-              v-model="selectedRoot"
-              :items="
-                items.map((item) => ({ title: item.name, value: item.root }))
-              "
-              :loading="loading"
-              density="compact"
-              variant="outlined"
-              hide-details
-              prepend-inner-icon="mdi-folder-outline"
-              class="workspace-switcher"
-            />
-            <v-btn
-              icon="mdi-plus"
-              size="small"
-              variant="text"
-              :aria-label="locale.t('$vuetify.chatroom.workspaces.createTitle')"
-              @click="
-                createError = '';
-                createOpen = true;
-              "
-            />
-            <v-btn
-              icon="mdi-refresh"
-              size="small"
-              variant="text"
-              :loading="loading"
-              @click="load"
-            />
-          </div>
-          <div v-if="selectedRoot" class="workspace-path">
-            {{ selectedRoot }}
+          <v-select
+            v-model="selectedRoot"
+            :items="
+              items.map((item) => ({ title: item.name, value: item.root }))
+            "
+            :loading="loading"
+            density="compact"
+            variant="outlined"
+            hide-details
+            prepend-inner-icon="mdi-folder-outline"
+            class="workspace-switcher"
+          />
+          <div class="workspace-meta-row">
+            <div
+              v-if="selectedRoot"
+              class="workspace-path"
+              :title="selectedRoot"
+            >
+              {{ selectedRoot }}
+            </div>
+            <div class="workspace-actions">
+              <v-btn
+                icon="mdi-plus"
+                size="small"
+                variant="text"
+                :aria-label="
+                  locale.t('$vuetify.chatroom.workspaces.createTitle')
+                "
+                @click="
+                  createError = '';
+                  createOpen = true;
+                "
+              />
+              <v-btn
+                icon="mdi-refresh"
+                size="small"
+                variant="text"
+                :loading="loading"
+                :aria-label="locale.t('$vuetify.chatroom.workspaces.refresh')"
+                @click="load"
+              />
+            </div>
           </div>
         </div>
       </div>

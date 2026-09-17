@@ -20,6 +20,7 @@ export class ComputerService {
   private revision = 0;
   private currentSnapshotId: string | null = null;
   private latestSnapshotValue: ComputerSnapshot | null = null;
+  private latestSnapshotCapturedAt: string | null = null;
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(
@@ -37,6 +38,10 @@ export class ComputerService {
     if (!settings.enabled) return null;
     this.assertScopeAllowed(scope, settings);
     return this.latestSnapshotValue;
+  }
+
+  latestSnapshotTimestamp(): string | null {
+    return this.latestSnapshotValue ? this.latestSnapshotCapturedAt : null;
   }
 
   requestPermission(permission: ComputerPermission): Promise<ComputerStatus> {
@@ -58,6 +63,7 @@ export class ComputerService {
     if (!next.enabled) {
       this.currentSnapshotId = null;
       this.latestSnapshotValue = null;
+      this.latestSnapshotCapturedAt = null;
       void this.backend.dispose().catch(() => undefined);
     }
     this.events.emit({ type: "computer-settings", settings: next });
@@ -76,6 +82,7 @@ export class ComputerService {
       value.snapshotId = this.currentSnapshotId;
       value.revision = this.revision;
       this.latestSnapshotValue = value;
+      this.latestSnapshotCapturedAt = new Date().toISOString();
       return value;
     });
   }
@@ -103,7 +110,10 @@ export class ComputerService {
       this.currentSnapshotId = null;
       const result = await this.backend.action(request, ++this.revision);
       this.currentSnapshotId = result.snapshot?.snapshotId ?? null;
-      if (result.snapshot) this.latestSnapshotValue = result.snapshot;
+      if (result.snapshot) {
+        this.latestSnapshotValue = result.snapshot;
+        this.latestSnapshotCapturedAt = new Date().toISOString();
+      }
       return result;
     });
   }
@@ -111,6 +121,7 @@ export class ComputerService {
   async shutdown(): Promise<void> {
     this.currentSnapshotId = null;
     this.latestSnapshotValue = null;
+    this.latestSnapshotCapturedAt = null;
     await this.backend.dispose();
   }
 

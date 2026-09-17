@@ -2,6 +2,7 @@
 import { useLocale } from "vuetify";
 import type { Operation } from "../api.js";
 import { appIntlLocale, sourceMessageKey } from "../locales.js";
+import { dateTime } from "../utils.js";
 
 defineProps<{ operations: Operation[]; busy: boolean }>();
 const emit = defineEmits<{ refresh: [] }>();
@@ -115,14 +116,6 @@ function asRecord(value: unknown): Record<string, unknown> {
     ? (value as Record<string, unknown>)
     : {};
 }
-
-function formatTime(value: string): string {
-  return new Intl.DateTimeFormat(appIntlLocale(locale.current.value), {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(new Date(value));
-}
 </script>
 
 <template>
@@ -155,7 +148,10 @@ function formatTime(value: string): string {
             operationDescription(operation)
           }}</v-list-item-title>
           <v-list-item-subtitle>
-            {{ formatTime(operation.startedAt) }} ·
+            {{
+              dateTime(operation.startedAt, appIntlLocale(locale.current.value))
+            }}
+            ·
             {{ sourceLabel(operation.source) }}
           </v-list-item-subtitle>
           <template #append>

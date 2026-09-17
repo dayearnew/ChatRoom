@@ -39,6 +39,7 @@ export type {
 export interface ComputerPreviewView {
   snapshotId: string;
   revision: number;
+  capturedAt: string | null;
   display: ComputerDisplay | null;
   activeApp: string | null;
   activeWindow: string | null;

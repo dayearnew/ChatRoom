@@ -1,4 +1,4 @@
-export const DATABASE_SCHEMA_VERSION = 1;
+export const DATABASE_SCHEMA_VERSION = 2;
 
 export const DATABASE_SCHEMA = `
   CREATE TABLE IF NOT EXISTS operations (
@@ -80,6 +80,12 @@ export const DATABASE_SCHEMA = `
     id INTEGER PRIMARY KEY CHECK(id = 1),
     enabled INTEGER NOT NULL DEFAULT 0,
     remote_access INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS mcp_tool_settings (
+    tool_name TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)),
     updated_at TEXT NOT NULL
   );
 

@@ -3,6 +3,7 @@ import type { ComputerService } from "../computer/computer-service.js";
 import type { GitService } from "../git/git-service.js";
 import type { ProcessSupervisor } from "../process/process-supervisor.js";
 import type { WorkspaceService } from "../workspace/workspace-service.js";
+import type { McpToolControl } from "../../mcp/server/tool-control.js";
 
 export class WebRuntime {
   constructor(
@@ -11,6 +12,7 @@ export class WebRuntime {
     readonly operations: OperationLog,
     readonly processes: ProcessSupervisor,
     readonly computer: ComputerService,
+    readonly mcpTools: McpToolControl,
   ) {}
 
   processKill(processId: string, force = false) {

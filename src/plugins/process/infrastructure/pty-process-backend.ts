@@ -66,6 +66,10 @@ class PtyBackendProcess implements BackendProcess {
     this.processHandle.write(data);
   }
   kill(signal: NodeJS.Signals = "SIGTERM"): void {
+    if (process.platform === "win32") {
+      this.processHandle.kill();
+      return;
+    }
     this.processHandle.kill(signal);
   }
   onStdout(listener: (chunk: Buffer) => void): void {

@@ -8,6 +8,7 @@ import type {
 import { asChatRoomError } from "../../core/errors/chatroom-error.js";
 import type { OperationLog } from "../../operations/operation-log.js";
 import { mcpTool } from "./tool-support.js";
+import type { McpToolControl } from "./tool-control.js";
 
 type PluginToolInput<Schema extends StandardSchemaWithJSON> =
   StandardSchemaWithJSON.InferOutput<Schema>;
@@ -37,9 +38,10 @@ export interface PluginToolConfig<
 
 export class PluginMcpRegistrar {
   constructor(
-    private readonly server: McpServer,
+    private readonly server: McpServer | null,
     private readonly operations: OperationLog,
     private readonly pluginId: string,
+    private readonly toolControl: McpToolControl,
   ) {}
 
   registerTool<
@@ -53,6 +55,14 @@ export class PluginMcpRegistrar {
       execution: PluginToolExecution,
     ) => Promise<unknown> | unknown,
   ): void {
+    this.toolControl.define({
+      name,
+      pluginId: this.pluginId,
+      title: config.title,
+      description: config.description,
+    });
+    if (!this.server) return;
+
     const { action, audit, present, ...toolConfig } = config;
     const callback = mcpTool<PluginToolInput<InputSchema>>(async (input) => {
       const operation = this.operations.start({
@@ -90,7 +100,8 @@ export class PluginMcpRegistrar {
         throw error;
       }
     }, present) as ToolCallback<InputSchema>;
-    this.server.registerTool(name, toolConfig, callback);
+    const registered = this.server.registerTool(name, toolConfig, callback);
+    this.toolControl.attach(name, registered);
   }
 }
 

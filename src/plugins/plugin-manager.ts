@@ -15,13 +15,29 @@ export class PluginManager {
       await plugin.activate(this.context);
       this.active.push(plugin);
     }
+    for (const plugin of this.active) {
+      if (!plugin.registerMcp) continue;
+      plugin.registerMcp(
+        new PluginMcpRegistrar(
+          null,
+          this.context.operations,
+          plugin.id,
+          this.context.mcpTools,
+        ),
+      );
+    }
   }
 
   registerMcp(server: McpServer): void {
     for (const plugin of this.active) {
       if (!plugin.registerMcp) continue;
       plugin.registerMcp(
-        new PluginMcpRegistrar(server, this.context.operations, plugin.id),
+        new PluginMcpRegistrar(
+          server,
+          this.context.operations,
+          plugin.id,
+          this.context.mcpTools,
+        ),
       );
     }
   }

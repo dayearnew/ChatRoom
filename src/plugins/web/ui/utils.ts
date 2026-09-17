@@ -5,6 +5,18 @@ export function duration(ms: number): string {
     return `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`;
   return `${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m`;
 }
+
+export function dateTime(value: string, locale?: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(value));
+}
+
 export function clock(value: string): string {
   return new Date(value).toLocaleTimeString([], {
     hour: "2-digit",

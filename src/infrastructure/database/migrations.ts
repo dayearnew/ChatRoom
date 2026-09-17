@@ -14,6 +14,10 @@ export function migrateDatabase(db: DatabaseSync): void {
         migrate0To1(db);
         version = 1;
         break;
+      case 1:
+        migrate1To2(db);
+        version = 2;
+        break;
       default:
         throw new Error(`Unsupported ChatRoom database schema: ${version}`);
     }
@@ -37,6 +41,24 @@ function migrate0To1(db: DatabaseSync): void {
       db.exec("ALTER TABLE operations DROP COLUMN workspace_id;");
 
     db.exec("PRAGMA user_version = 1; COMMIT;");
+  } catch (error) {
+    db.exec("ROLLBACK;");
+    throw error;
+  }
+}
+
+function migrate1To2(db: DatabaseSync): void {
+  db.exec("BEGIN IMMEDIATE;");
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS mcp_tool_settings (
+        tool_name TEXT PRIMARY KEY,
+        enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)),
+        updated_at TEXT NOT NULL
+      );
+      PRAGMA user_version = 2;
+      COMMIT;
+    `);
   } catch (error) {
     db.exec("ROLLBACK;");
     throw error;

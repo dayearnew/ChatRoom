@@ -1,6 +1,7 @@
 import type { ChatRoomConfig } from "../config/types.js";
 import { AppDatabase } from "../infrastructure/database/app-database.js";
 import { OperationRepository } from "../infrastructure/database/operation-repository.js";
+import { McpToolSettingsRepository } from "../infrastructure/database/mcp-tool-settings-repository.js";
 import { OAuthRepository } from "../infrastructure/database/oauth-repository.js";
 import { PasskeyRepository } from "../infrastructure/database/passkey-repository.js";
 import { WebSessionRepository } from "../infrastructure/database/web-session-repository.js";
@@ -24,6 +25,7 @@ import {
 } from "../plugins/computer/plugin.js";
 import { createWebPlugin, WebServiceToken } from "../plugins/web/plugin.js";
 import { createChatRoomMcpHandler } from "../mcp/server/create-mcp-server.js";
+import { McpToolControl } from "../mcp/server/tool-control.js";
 import { HttpServer } from "../infrastructure/http/http-server.js";
 
 export interface ApplicationComponents {
@@ -50,6 +52,9 @@ export async function createApplication(
       config.operations.maxPayloadBytes,
     );
     operations.reconcileInterrupted();
+    const mcpTools = new McpToolControl(
+      new McpToolSettingsRepository(database),
+    );
     const externalAccess = new ExternalAccessRegistry(config.auth);
     const auth = new AuthService(
       new OAuthRepository(database),
@@ -63,6 +68,7 @@ export async function createApplication(
         config,
         database,
         operations,
+        mcpTools,
         events: eventBus,
         externalAccess,
         services,
