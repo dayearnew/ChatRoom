@@ -721,3 +721,177 @@
   position: sticky;
   top: calc(var(--v-layout-top, 64px) + 18px);
 }
+
+.system-logs-layout {
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 0.85fr);
+}
+
+.system-logs-header {
+  min-height: 58px;
+}
+
+.system-log-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.system-log-controls .operation-filters {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.system-log-controls .operation-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.system-log-module-filter {
+  min-width: 9rem;
+  flex: 0 1 13rem;
+}
+
+.system-log-list {
+  display: grid;
+  grid-template-columns: max-content max-content max-content minmax(0, 1fr);
+  container-type: inline-size;
+}
+
+.system-log-header,
+.system-log-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: 12px;
+  align-items: center;
+}
+
+.system-log-header {
+  min-height: 32px;
+  padding: 6px 12px;
+  border-bottom: 1px solid rgb(var(--v-theme-outline), 0.08);
+  background: rgb(var(--v-theme-on-surface), 0.018);
+  color: rgb(var(--v-theme-on-surface), 0.46);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.system-log-header > span:nth-child(2),
+.system-log-header > span:nth-child(3) {
+  justify-self: center;
+  text-align: center;
+}
+
+.system-log-row {
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid rgb(var(--v-theme-outline), 0.08);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.system-log-row:hover,
+.system-log-row.selected-row {
+  background: rgb(var(--v-theme-primary), 0.045);
+}
+
+.system-log-time,
+.system-log-module {
+  color: rgb(var(--v-theme-on-surface), 0.56);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.system-log-level,
+.system-log-module {
+  width: 100%;
+  justify-self: stretch;
+  text-align: center;
+}
+
+.system-log-message {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.system-log-message strong,
+.system-log-message small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.system-log-message strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.system-log-message small {
+  color: rgb(var(--v-theme-on-surface), 0.48);
+  font-size: 10.5px;
+}
+
+.system-log-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 8px 12px;
+}
+
+.system-log-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.system-log-facts strong {
+  overflow-wrap: anywhere;
+}
+
+.system-log-detail-data {
+  padding: 12px 18px 18px;
+}
+
+@container (max-width: 620px) {
+  .system-log-header {
+    display: none;
+  }
+
+  .system-log-row {
+    grid-template-columns: max-content max-content minmax(0, 1fr);
+    grid-template-areas:
+      "time level module"
+      "message message message";
+    gap: 4px 8px;
+  }
+
+  .system-log-time {
+    grid-area: time;
+  }
+
+  .system-log-level {
+    grid-area: level;
+  }
+
+  .system-log-module {
+    grid-area: module;
+    min-width: 0;
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+  }
+
+  .system-log-message {
+    grid-area: message;
+  }
+}

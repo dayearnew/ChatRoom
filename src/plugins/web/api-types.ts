@@ -114,3 +114,20 @@ export interface CloudManagementSession {
 export interface CloudRestoreResult {
   status: CloudStatus;
 }
+
+export type SystemLogLevel = "debug" | "info" | "warn" | "error";
+
+export interface SystemLogRecord {
+  id: string;
+  timestamp: string;
+  level: SystemLogLevel;
+  module: string;
+  event: string;
+  message: string;
+  data?: Record<string, unknown>;
+}
+
+export interface SystemLogPage {
+  items: SystemLogRecord[];
+  nextBefore: string | null;
+}

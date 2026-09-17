@@ -14,7 +14,23 @@ export class PluginManager {
     try {
       for (const plugin of this.plugins) {
         this.active.push(plugin);
-        await plugin.activate(this.context);
+        try {
+          await plugin.activate(this.context);
+          this.context.logger?.info(
+            "plugin",
+            "plugin.activated",
+            `Plugin activated: ${plugin.id}`,
+            { pluginId: plugin.id },
+          );
+        } catch (error) {
+          this.context.logger?.error(
+            "plugin",
+            "plugin.activate_failed",
+            `Plugin activation failed: ${plugin.id}`,
+            { pluginId: plugin.id, error },
+          );
+          throw error;
+        }
       }
       for (const plugin of this.active) {
         if (!plugin.registerMcp) continue;
@@ -60,6 +76,12 @@ export class PluginManager {
       try {
         await plugin.deactivate?.();
       } catch (error) {
+        this.context.logger?.error(
+          "plugin",
+          "plugin.deactivate_failed",
+          `Plugin deactivation failed: ${plugin.id}`,
+          { pluginId: plugin.id, error },
+        );
         errors.push(error);
       }
     }

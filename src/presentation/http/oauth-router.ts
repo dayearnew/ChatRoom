@@ -4,6 +4,7 @@ import type {
   AuthorizationRequest,
 } from "../../auth/auth-service.js";
 import type { IngressPolicy } from "../../auth/ingress-policy.js";
+import type { SystemLogSink } from "../../core/logging/types.js";
 import {
   asChatRoomError,
   ChatRoomError,
@@ -13,6 +14,7 @@ import { escapeHtml, requireString } from "./http-utils.js";
 export function createOAuthRouter(
   auth: AuthService,
   ingress: IngressPolicy,
+  logger: SystemLogSink,
 ): Router {
   const router = Router();
   router.get("/.well-known/oauth-authorization-server", (req, res) =>
@@ -54,6 +56,9 @@ export function createOAuthRouter(
       request,
       requireString(body.owner_token, "owner_token"),
     );
+    logger.info("auth", "oauth.success", "OAuth authorization approved", {
+      flow: "authorization",
+    });
     const redirect = new URL(request.redirectUri);
     redirect.searchParams.set("code", code);
     if (request.state) redirect.searchParams.set("state", request.state);
@@ -79,6 +84,9 @@ export function createOAuthRouter(
     } else {
       throw new ChatRoomError("INVALID_INPUT", "Unsupported OAuth grant_type");
     }
+    logger.info("auth", "oauth.success", "OAuth token issued", {
+      flow: typeof body.grant_type === "string" ? body.grant_type : "unknown",
+    });
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   });
@@ -88,11 +96,11 @@ export function createOAuthRouter(
     if (token) auth.revoke(token);
     res.status(200).end();
   });
-  router.use(oauthErrorMiddleware());
+  router.use(oauthErrorMiddleware(logger));
   return router;
 }
 
-function oauthErrorMiddleware(): ErrorRequestHandler {
+function oauthErrorMiddleware(logger: SystemLogSink): ErrorRequestHandler {
   return (error, req, res, _next) => {
     const normalized = asChatRoomError(error);
     let code = "invalid_request";
@@ -104,6 +112,10 @@ function oauthErrorMiddleware(): ErrorRequestHandler {
     )
       code = "invalid_redirect_uri";
     else if (normalized.code === "FORBIDDEN") code = "access_denied";
+    logger.warn("auth", "oauth.failed", "OAuth request failed", {
+      path: req.path,
+      reason: code,
+    });
     res.setHeader("Cache-Control", "no-store");
     res
       .status(400)

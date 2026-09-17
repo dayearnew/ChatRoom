@@ -18,6 +18,9 @@ import {
   createPublicAuthApiRouter,
 } from "./auth-api-router.js";
 import { createRuntimeApiRouter } from "./runtime-api-router.js";
+import { createLogsApiRouter } from "./logs-api-router.js";
+import type { SystemLogSink } from "../../../core/logging/types.js";
+import type { SystemLogReader } from "../../../infrastructure/logging/log-reader.js";
 
 export function createApiRouter(
   application: WebRuntime,
@@ -26,6 +29,8 @@ export function createApiRouter(
   passkeys: PasskeyService,
   ingress: IngressPolicy,
   cloud: CloudController,
+  logger: SystemLogSink,
+  logReader: SystemLogReader,
   runtimeStatus: () => {
     version: string;
     mcpRequests: number;
@@ -33,10 +38,11 @@ export function createApiRouter(
   },
 ): Router {
   const router = Router();
-  router.use(createPublicAuthApiRouter(auth, passkeys, ingress));
+  router.use(createPublicAuthApiRouter(auth, passkeys, ingress, logger));
   router.use(apiAuthentication(auth, ingress));
-  router.use(createPrivateAuthApiRouter(passkeys, ingress));
+  router.use(createPrivateAuthApiRouter(passkeys, ingress, logger));
   router.use(createRuntimeApiRouter(application, eventBus, runtimeStatus));
+  router.use(createLogsApiRouter(logReader, logger));
 
   router.get("/operations", (req, res) => {
     res.json(

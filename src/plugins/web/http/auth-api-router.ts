@@ -6,6 +6,7 @@ import type {
 import type { AuthService } from "../../../auth/auth-service.js";
 import type { IngressPolicy } from "../../../auth/ingress-policy.js";
 import type { PasskeyService } from "../../../auth/passkey-service.js";
+import type { SystemLogSink } from "../../../core/logging/types.js";
 import {
   asyncRoute,
   parseCookie,
@@ -18,6 +19,7 @@ export function createPublicAuthApiRouter(
   auth: AuthService,
   passkeys: PasskeyService,
   ingress: IngressPolicy,
+  logger: SystemLogSink,
 ): Router {
   const router = Router();
 
@@ -41,17 +43,28 @@ export function createPublicAuthApiRouter(
         return;
       }
       const body = req.body as Record<string, unknown>;
-      const session = auth.createWebSession(
-        requireString(body.ownerToken, "ownerToken"),
-        body.remember !== false,
-      );
-      setSessionCookie(
-        res,
-        session.token,
-        session.maxAgeSeconds,
-        ingress.secureWebCookie(req),
-      );
-      res.json({ authenticated: true, expiresAt: session.expiresAt });
+      try {
+        const session = auth.createWebSession(
+          requireString(body.ownerToken, "ownerToken"),
+          body.remember !== false,
+        );
+        setSessionCookie(
+          res,
+          session.token,
+          session.maxAgeSeconds,
+          ingress.secureWebCookie(req),
+        );
+        logger.info("auth", "auth.success", "Web authentication succeeded", {
+          method: "owner_token",
+        });
+        res.json({ authenticated: true, expiresAt: session.expiresAt });
+      } catch (error) {
+        logger.warn("auth", "auth.failed", "Web authentication failed", {
+          method: "owner_token",
+          reason: "invalid_owner_token",
+        });
+        throw error;
+      }
     }),
   );
 
@@ -68,24 +81,42 @@ export function createPublicAuthApiRouter(
     "/auth/passkey/verify",
     asyncRoute(async (req, res) => {
       const body = req.body as Record<string, unknown>;
-      await passkeys.verifyAuthentication({
-        challengeId: requireString(body.challengeId, "challengeId"),
-        response: body.response as AuthenticationResponseJSON,
-      });
-      const session = auth.createPasskeyWebSession(body.remember !== false);
-      setSessionCookie(
-        res,
-        session.token,
-        session.maxAgeSeconds,
-        ingress.secureWebCookie(req),
-      );
-      res.json({ authenticated: true, expiresAt: session.expiresAt });
+      try {
+        await passkeys.verifyAuthentication({
+          challengeId: requireString(body.challengeId, "challengeId"),
+          response: body.response as AuthenticationResponseJSON,
+        });
+        const session = auth.createPasskeyWebSession(body.remember !== false);
+        setSessionCookie(
+          res,
+          session.token,
+          session.maxAgeSeconds,
+          ingress.secureWebCookie(req),
+        );
+        logger.info(
+          "auth",
+          "auth.passkey_success",
+          "Passkey authentication succeeded",
+        );
+        res.json({ authenticated: true, expiresAt: session.expiresAt });
+      } catch (error) {
+        logger.warn(
+          "auth",
+          "auth.passkey_failed",
+          "Passkey authentication failed",
+          { reason: "passkey_verification_failed" },
+        );
+        throw error;
+      }
     }),
   );
 
   router.post("/auth/logout", (req, res) => {
     const token = sessionToken(req.headers.cookie);
-    if (token) auth.revokeWebSession(token);
+    if (token) {
+      auth.revokeWebSession(token);
+      logger.info("auth", "auth.logout", "Web session signed out");
+    }
     const secure = ingress.secureWebCookie(req) ? "; Secure" : "";
     res.setHeader(
       "Set-Cookie",
@@ -100,6 +131,7 @@ export function createPublicAuthApiRouter(
 export function createPrivateAuthApiRouter(
   passkeys: PasskeyService,
   ingress: IngressPolicy,
+  logger: SystemLogSink,
 ): Router {
   const router = Router();
 
@@ -114,17 +146,28 @@ export function createPrivateAuthApiRouter(
     "/auth/passkeys/register/verify",
     asyncRoute(async (req, res) => {
       const body = req.body as Record<string, unknown>;
-      res.status(201).json(
-        await passkeys.verifyRegistration({
+      try {
+        const passkey = await passkeys.verifyRegistration({
           challengeId: requireString(body.challengeId, "challengeId"),
           response: body.response as RegistrationResponseJSON,
           ...(typeof body.name === "string" ? { name: body.name } : {}),
-        }),
-      );
+        });
+        logger.info("auth", "auth.passkey_registered", "Passkey registered");
+        res.status(201).json(passkey);
+      } catch (error) {
+        logger.warn(
+          "auth",
+          "auth.passkey_register_failed",
+          "Passkey registration failed",
+          { reason: "passkey_registration_failed" },
+        );
+        throw error;
+      }
     }),
   );
   router.delete("/auth/passkeys/:credentialId", (req, res) => {
     passkeys.remove(requireString(req.params.credentialId, "credentialId"));
+    logger.info("auth", "auth.passkey_removed", "Passkey removed");
     res.status(204).end();
   });
 

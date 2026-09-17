@@ -8,7 +8,13 @@ import {
 } from "vue";
 
 export type View =
-  "workspaces" | "processes" | "computer" | "tools" | "cloud" | "operations";
+  | "workspaces"
+  | "processes"
+  | "computer"
+  | "tools"
+  | "cloud"
+  | "operations"
+  | "systemLogs";
 
 interface ViewDefinition {
   id: View;
@@ -71,6 +77,15 @@ const definitions: readonly ViewDefinition[] = [
     icon: "$mdiTextBoxOutline",
     component: defineAsyncComponent(
       () => import("../components/OperationsView.vue"),
+    ),
+  },
+  {
+    id: "systemLogs",
+    path: "/system-logs",
+    titleKey: "nav.systemLogs",
+    icon: "$mdiTextSearch",
+    component: defineAsyncComponent(
+      () => import("../components/SystemLogsView.vue"),
     ),
   },
 ] as const;

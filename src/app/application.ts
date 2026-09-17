@@ -27,6 +27,8 @@ import { createWebPlugin, WebServiceToken } from "../plugins/web/plugin.js";
 import { createChatRoomMcpHandler } from "../mcp/server/create-mcp-server.js";
 import { McpToolControl } from "../mcp/server/tool-control.js";
 import { HttpServer } from "../infrastructure/http/http-server.js";
+import { SystemLogger } from "../infrastructure/logging/logger.js";
+import { SystemLogReader } from "../infrastructure/logging/log-reader.js";
 
 export interface ApplicationComponents {
   database: AppDatabase;
@@ -38,10 +40,12 @@ export interface ApplicationComponents {
   cloud: import("../plugins/cloud/controller.js").CloudController;
   computer: import("../plugins/computer/computer-service.js").ComputerService;
   http: HttpServer;
+  logger: SystemLogger;
 }
 
 export async function createApplication(
   config: ChatRoomConfig,
+  logger = new SystemLogger(config.dataDir),
 ): Promise<ApplicationComponents> {
   const database = new AppDatabase(config.databasePath);
   try {
@@ -72,6 +76,7 @@ export async function createApplication(
         events: eventBus,
         externalAccess,
         services,
+        logger,
       },
       [
         createWorkspacePlugin(),
@@ -88,6 +93,7 @@ export async function createApplication(
     const cloud = services.require(CloudService);
     const computer = services.require(ComputerServiceToken);
     const mcp = createChatRoomMcpHandler(plugins);
+    const logReader = new SystemLogReader(logger.filePath);
     const http = new HttpServer(
       config,
       web.application,
@@ -97,6 +103,8 @@ export async function createApplication(
       mcp,
       externalAccess,
       cloud,
+      logger,
+      logReader,
     );
     return {
       database,
@@ -108,6 +116,7 @@ export async function createApplication(
       cloud,
       computer,
       http,
+      logger,
     };
   } catch (error) {
     database.close();

@@ -5,6 +5,7 @@ import type { OperationLog } from "../operations/operation-log.js";
 import type { McpToolControl } from "../mcp/server/tool-control.js";
 import type { RuntimeEventBus } from "../app/event-bus.js";
 import type { ExternalAccessRegistry } from "../app/external-access-registry.js";
+import type { SystemLogSink } from "../core/logging/types.js";
 
 export interface ServiceToken<T> {
   readonly key: symbol;
@@ -38,6 +39,7 @@ export interface PluginContext {
   events: RuntimeEventBus;
   externalAccess: ExternalAccessRegistry;
   services: ServiceRegistry;
+  logger: SystemLogSink;
 }
 
 export interface InternalPlugin {

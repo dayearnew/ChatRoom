@@ -1,6 +1,7 @@
 export const enChatRoom = {
   nav: {
     operations: "Operations",
+    systemLogs: "System Logs",
     workspaces: "Workspaces",
     processes: "Processes",
     computer: "Computer",
@@ -169,6 +170,23 @@ export const enChatRoom = {
       "Completed operation records will be permanently deleted. Running operations are preserved until they finish.",
     clearConfirm: "Clear history",
     back: "Back to operations",
+  },
+  systemLogs: {
+    title: "System logs",
+    subtitle: "ChatRoom runtime, authentication, Cloud, and plugin events",
+    allLevels: "All levels",
+    allModules: "All modules",
+    refresh: "Refresh logs",
+    empty: "No system logs yet.",
+    select: "Select a log entry to inspect details.",
+    loadMore: "Load earlier logs",
+    back: "Back to system logs",
+    time: "Time",
+    level: "Level",
+    module: "Module",
+    event: "Event",
+    message: "Message",
+    data: "Details",
   },
   table: {
     time: "Time",

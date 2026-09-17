@@ -1,5 +1,6 @@
 import type { ChatRoomConfig } from "../../config/types.js";
 import { ChatRoomError } from "../../core/errors/chatroom-error.js";
+import type { SystemLogSink } from "../../core/logging/types.js";
 import { CloudApiClient } from "./api-client.js";
 import { CloudStateStore } from "./state-store.js";
 import { CloudTunnelClient } from "./tunnel-client.js";
@@ -35,6 +36,7 @@ export class CloudController {
     private readonly config: ChatRoomConfig,
     cloudApi: string,
     private readonly externalAccess?: ExternalAccessSink,
+    private readonly logger?: SystemLogSink,
   ) {
     this.store = new CloudStateStore(config.dataDir);
     this.api = new CloudApiClient(cloudApi);
@@ -43,11 +45,17 @@ export class CloudController {
   static async create(
     config: ChatRoomConfig,
     externalAccess?: ExternalAccessSink,
+    logger?: SystemLogSink,
   ): Promise<CloudController> {
     const apiBaseUrl = (
       process.env.CHATROOM_CLOUD_API ?? "https://chatroomcp.com"
     ).replace(/\/$/, "");
-    const controller = new CloudController(config, apiBaseUrl, externalAccess);
+    const controller = new CloudController(
+      config,
+      apiBaseUrl,
+      externalAccess,
+      logger,
+    );
     await controller.ensureState().catch(() => undefined);
     return controller;
   }
@@ -290,6 +298,14 @@ export class CloudController {
     )
       return;
     this.connection = "connecting";
+    this.logger?.info(
+      "cloud",
+      "cloud.connecting",
+      "Cloud tunnel is connecting",
+      {
+        services: state.lease.services,
+      },
+    );
     this.tunnel = new CloudTunnelClient(
       state.lease,
       { devicePrivateKey: state.devicePrivateKey },
@@ -298,10 +314,24 @@ export class CloudController {
         onConnected: () => {
           this.lastError = null;
           this.connection = "connected";
+          this.logger?.info(
+            "cloud",
+            "cloud.connected",
+            "Cloud tunnel connected",
+            {
+              services: this.state?.lease?.services ?? [],
+            },
+          );
         },
         onDisconnected: () => {
-          if (!this.stopped && this.state?.lease)
+          if (!this.stopped && this.state?.lease) {
             this.connection = "disconnected";
+            this.logger?.warn(
+              "cloud",
+              "cloud.disconnected",
+              "Cloud tunnel disconnected",
+            );
+          }
         },
         onError: (error) => this.setError(error),
       },
@@ -421,6 +451,12 @@ export class CloudController {
       const detail = error instanceof Error ? error.message : String(error);
       this.lastError = `Cloud state unavailable: ${detail}`;
       this.connection = "error";
+      this.logger?.error(
+        "cloud",
+        "cloud.state_unavailable",
+        "Cloud state is unavailable",
+        { error },
+      );
       throw new ChatRoomError(
         "INTERNAL",
         "ChatRoom Cloud is unavailable",
@@ -441,6 +477,9 @@ export class CloudController {
   private setError(error: unknown): void {
     this.lastError = error instanceof Error ? error.message : String(error);
     this.connection = "error";
+    this.logger?.error("cloud", "cloud.error", "Cloud operation failed", {
+      error,
+    });
   }
 }
 

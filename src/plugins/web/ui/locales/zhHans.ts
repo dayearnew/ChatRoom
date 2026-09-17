@@ -3,6 +3,7 @@ import type { enChatRoom } from "./en.js";
 export const zhChatRoom: typeof enChatRoom = {
   nav: {
     operations: "操作日志",
+    systemLogs: "系统日志",
     workspaces: "工作区",
     processes: "进程",
     computer: "电脑控制",
@@ -170,6 +171,23 @@ export const zhChatRoom: typeof enChatRoom = {
       "已完成的操作记录将被永久删除。正在运行的操作会保留，直到操作结束。",
     clearConfirm: "清空记录",
     back: "返回操作日志",
+  },
+  systemLogs: {
+    title: "系统日志",
+    subtitle: "ChatRoom 运行时、认证、Cloud 与插件事件",
+    allLevels: "全部级别",
+    allModules: "全部模块",
+    refresh: "刷新日志",
+    empty: "暂无系统日志。",
+    select: "选择一条日志查看详情。",
+    loadMore: "加载更早日志",
+    back: "返回系统日志",
+    time: "时间",
+    level: "级别",
+    module: "模块",
+    event: "事件",
+    message: "消息",
+    data: "详细信息",
   },
   table: {
     time: "时间",

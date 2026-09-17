@@ -13,6 +13,7 @@ export function createCloudPlugin(): InternalPlugin {
       controller = await CloudController.create(
         context.config,
         context.externalAccess,
+        context.logger,
       );
       context.services.provide(CloudService, controller);
     },
