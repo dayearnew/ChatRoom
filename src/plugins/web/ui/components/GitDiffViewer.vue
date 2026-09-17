@@ -60,15 +60,17 @@ const rows = computed<DiffRow[]>(() => {
 
 <template>
   <div class="git-diff-viewer">
-    <div
-      v-for="(row, index) in rows"
-      :key="index"
-      class="git-diff-row"
-      :class="`git-diff-row-${row.kind}`"
-    >
-      <span class="git-diff-line-number">{{ row.oldLine ?? "" }}</span>
-      <span class="git-diff-line-number">{{ row.newLine ?? "" }}</span>
-      <code class="git-diff-line">{{ row.text }}</code>
+    <div class="git-diff-content">
+      <div
+        v-for="(row, index) in rows"
+        :key="index"
+        class="git-diff-row"
+        :class="`git-diff-row-${row.kind}`"
+      >
+        <span class="git-diff-line-number">{{ row.oldLine ?? "" }}</span>
+        <span class="git-diff-line-number">{{ row.newLine ?? "" }}</span>
+        <code class="git-diff-line">{{ row.text }}</code>
+      </div>
     </div>
   </div>
 </template>

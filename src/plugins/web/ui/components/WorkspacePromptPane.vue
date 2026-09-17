@@ -2,6 +2,8 @@
 import { computed, ref, watch } from "vue";
 import { useLocale } from "vuetify";
 import { api, type WorkspaceInfo } from "../api.js";
+import { errorMessage } from "../utils/errors.js";
+import { createRequestGate } from "../utils/requests.js";
 
 const SUMMARY_PATH = ".chatroom/summary.md";
 const PROMPT_PATH = ".chatroom/prompt.md";
@@ -16,6 +18,7 @@ const saving = ref(false);
 const saved = ref(false);
 const error = ref("");
 const locale = useLocale();
+const loadRequests = createRequestGate();
 
 const dirty = computed(
   () =>
@@ -30,48 +33,56 @@ watch(
 );
 
 async function load() {
+  const request = loadRequests.begin();
+  const root = props.root;
   loading.value = true;
   error.value = "";
   saved.value = false;
   try {
     const info = await api<WorkspaceInfo>(
-      `/workspace?root=${encodeURIComponent(props.root)}`,
+      `/workspace?root=${encodeURIComponent(root)}`,
+      { signal: request.signal },
     );
+    if (!loadRequests.isCurrent(request) || props.root !== root) return;
     summary.value = info.summary ?? "";
     prompt.value = info.presetPrompt ?? "";
     originalSummary.value = summary.value;
     originalPrompt.value = prompt.value;
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : String(cause);
+    if (loadRequests.isCurrent(request)) error.value = errorMessage(cause);
   } finally {
-    loading.value = false;
+    if (loadRequests.isCurrent(request)) loading.value = false;
   }
 }
 
-async function writeFile(path: string, content: string) {
+async function writeFile(root: string, path: string, content: string) {
   await api("/workspace/file", {
     method: "PUT",
-    body: JSON.stringify({ root: props.root, path, content }),
+    body: JSON.stringify({ root, path, content }),
   });
 }
 
 async function save() {
   if (!dirty.value) return;
+  const root = props.root;
+  const nextSummary = summary.value;
+  const nextPrompt = prompt.value;
   saving.value = true;
   error.value = "";
   saved.value = false;
   try {
     const writes: Promise<void>[] = [];
-    if (summary.value !== originalSummary.value)
-      writes.push(writeFile(SUMMARY_PATH, summary.value));
-    if (prompt.value !== originalPrompt.value)
-      writes.push(writeFile(PROMPT_PATH, prompt.value));
+    if (nextSummary !== originalSummary.value)
+      writes.push(writeFile(root, SUMMARY_PATH, nextSummary));
+    if (nextPrompt !== originalPrompt.value)
+      writes.push(writeFile(root, PROMPT_PATH, nextPrompt));
     await Promise.all(writes);
-    originalSummary.value = summary.value;
-    originalPrompt.value = prompt.value;
+    if (props.root !== root) return;
+    originalSummary.value = nextSummary;
+    originalPrompt.value = nextPrompt;
     saved.value = true;
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : String(cause);
+    if (props.root === root) error.value = errorMessage(cause);
   } finally {
     saving.value = false;
   }

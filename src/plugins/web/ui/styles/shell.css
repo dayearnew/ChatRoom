@@ -1,0 +1,258 @@
+.app-shell {
+  background: rgb(var(--v-theme-background));
+}
+
+.app-drawer {
+  background: rgb(var(--v-theme-surface));
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.brand-mark-large {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 18px;
+}
+
+.nav-list {
+  padding: 8px 10px;
+}
+
+.nav-list .v-list-item {
+  margin-bottom: 4px;
+}
+
+.nav-list .v-list-item--active {
+  background: rgb(var(--v-theme-primary), 0.09);
+}
+
+.drawer-runtime {
+  padding: 10px 14px;
+  border-top: 1px solid rgb(var(--v-theme-outline), 0.08);
+}
+
+.drawer-runtime-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 22px;
+  color: rgb(var(--v-theme-on-surface), 0.48);
+  font-size: 11px;
+}
+
+.drawer-runtime-row strong {
+  overflow: hidden;
+  color: rgb(var(--v-theme-on-surface), 0.72);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer-version-value {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.drawer-version-value .v-chip {
+  flex: 0 0 auto;
+  font-family: inherit;
+}
+
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid rgb(var(--v-theme-outline), 0.12);
+}
+
+.drawer-actions .v-btn {
+  flex: 0 0 auto;
+}
+
+.app-bar.v-app-bar {
+  background: rgb(var(--v-theme-background), 0.92);
+  border-bottom: 1px solid rgb(var(--v-theme-outline), 0.1);
+  backdrop-filter: blur(14px);
+}
+
+.page-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.connection-state {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 18px;
+  color: rgb(var(--v-theme-on-surface), 0.58);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.connection-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-on-surface), 0.38);
+  box-shadow: 0 0 0 3px rgb(var(--v-theme-on-surface), 0.08);
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.connection-state[data-state="connected"] .connection-dot {
+  background: rgb(var(--v-theme-success));
+  box-shadow: 0 0 0 3px rgb(var(--v-theme-success), 0.12);
+}
+
+.connection-state[data-state="connecting"] .connection-dot,
+.connection-state[data-state="reconnecting"] .connection-dot {
+  background: rgb(var(--v-theme-warning));
+  box-shadow: 0 0 0 3px rgb(var(--v-theme-warning), 0.12);
+}
+
+.connection-state[data-state="offline"] .connection-dot {
+  background: rgb(var(--v-theme-error));
+  box-shadow: 0 0 0 3px rgb(var(--v-theme-error), 0.12);
+}
+
+.app-content {
+  --app-content-block-start: 22px;
+  --app-content-block-end: max(30px, env(safe-area-inset-bottom));
+
+  width: 100%;
+  padding: var(--app-content-block-start) max(26px, env(safe-area-inset-right))
+    var(--app-content-block-end) max(26px, env(safe-area-inset-left));
+}
+
+.login-page {
+  position: relative;
+  display: flex;
+  min-height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  padding: max(72px, env(safe-area-inset-top)) 16px
+    max(24px, env(safe-area-inset-bottom));
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      rgb(var(--v-theme-primary), 0.08),
+      transparent 38%
+    ),
+    rgb(var(--v-theme-background));
+}
+
+.login-utilities {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-card.v-card {
+  width: min(400px, 100%);
+  border-color: rgb(var(--v-theme-outline), 0.12);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+}
+
+.login-card-content.v-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 32px;
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgb(var(--v-theme-on-surface), 0.42);
+  font-size: 11px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  height: 1px;
+  flex: 1;
+  background: rgb(var(--v-theme-outline), 0.12);
+  content: "";
+}
+
+.remember-device {
+  margin-top: -8px;
+}
+
+.passkey-dialog {
+  overflow: hidden;
+}
+
+.passkey-dialog-content.v-card-text {
+  padding: 18px;
+}
+
+.passkey-register-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.passkey-register-row .v-btn {
+  min-height: 48px;
+}
+
+.passkey-list {
+  overflow: hidden;
+  border: 1px solid rgb(var(--v-theme-outline), 0.1);
+  border-radius: 12px;
+}
+
+.passkey-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 64px;
+  padding: 10px 10px 10px 14px;
+  border-bottom: 1px solid rgb(var(--v-theme-outline), 0.08);
+}
+
+.passkey-row:last-child {
+  border-bottom: 0;
+}
+
+.passkey-row-main {
+  min-width: 0;
+}

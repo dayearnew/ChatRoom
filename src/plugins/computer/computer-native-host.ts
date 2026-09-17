@@ -31,8 +31,10 @@ export class ComputerNativeHost {
   private socketPath: string | null = null;
   private lines: Interface | null = null;
   private starting: Promise<void> | null = null;
+  private cancelStarting: ((error: Error) => void) | null = null;
   private readonly pending = new Map<string, PendingRequest>();
   private sequence = 0;
+  private generation = 0;
 
   get platform(): ComputerPlatform {
     if (process.platform === "darwin") return "macos";
@@ -96,25 +98,39 @@ export class ComputerNativeHost {
       return;
     if (this.starting) return this.starting;
 
-    this.starting = this.startHelper(platform);
+    const generation = this.generation;
+    const starting = this.startHelper(platform, generation);
+    this.starting = starting;
     try {
-      await this.starting;
+      await starting;
+      if (generation !== this.generation)
+        throw new Error("Computer helper start was superseded");
     } finally {
-      this.starting = null;
+      if (this.starting === starting) this.starting = null;
+      if (generation === this.generation) this.cancelStarting = null;
     }
   }
 
-  private startHelper(platform: ComputerPlatform): Promise<void> {
+  private startHelper(
+    platform: ComputerPlatform,
+    generation: number,
+  ): Promise<void> {
     switch (platform) {
       case "macos":
-        return this.startMacHelper();
+        return this.startMacHelper(generation);
       case "windows":
-        return this.startPipeHelper(windowsHelperPath(), "Windows");
+        return this.startPipeHelper(
+          windowsHelperPath(),
+          "Windows",
+          process.env,
+          generation,
+        );
       case "linux":
         return this.startPipeHelper(
           linuxHelperPath(),
           "Linux X11",
           linuxDesktopEnvironment(),
+          generation,
         );
       case "unsupported":
         return Promise.reject(
@@ -126,7 +142,7 @@ export class ComputerNativeHost {
     }
   }
 
-  private async startMacHelper(): Promise<void> {
+  private async startMacHelper(generation: number): Promise<void> {
     const app = macHelperAppPath();
     if (!app)
       throw new ChatRoomError(
@@ -154,20 +170,23 @@ export class ComputerNativeHost {
       const cleanupServer = () => {
         clearTimeout(timer);
         if (this.socketServer === server) this.socketServer = null;
-        server.close();
+        if (this.cancelStarting === fail) this.cancelStarting = null;
+        if (server.listening) server.close();
       };
       const fail = (error: Error) => {
         if (settled) return;
         settled = true;
         cleanupServer();
-        this.cleanupSocketPath();
+        this.cleanupSocketPath(socketPath);
         reject(error);
       };
+      this.cancelStarting = fail;
 
       server.once("error", fail);
       server.once("connection", (socket) => {
-        if (settled) {
+        if (settled || generation !== this.generation) {
           socket.destroy();
+          if (!settled) fail(new Error("Computer helper start was superseded"));
           return;
         }
         settled = true;
@@ -178,6 +197,10 @@ export class ComputerNativeHost {
       });
 
       server.listen(socketPath, () => {
+        if (generation !== this.generation) {
+          fail(new Error("Computer helper start was superseded"));
+          return;
+        }
         chmodSync(socketPath, 0o600);
         const launcher = spawn(
           "/usr/bin/open",
@@ -202,7 +225,8 @@ export class ComputerNativeHost {
   private async startPipeHelper(
     executable: string | null,
     platformName: string,
-    env: NodeJS.ProcessEnv = process.env,
+    env: NodeJS.ProcessEnv,
+    generation: number,
   ): Promise<void> {
     if (!executable)
       throw new ChatRoomError(
@@ -215,6 +239,10 @@ export class ComputerNativeHost {
       windowsHide: process.platform === "win32",
       env,
     });
+    if (generation !== this.generation) {
+      child.kill();
+      throw new Error("Computer helper start was superseded");
+    }
     this.child = child;
     this.lines = createInterface({ input: child.stdout });
     this.lines.on("line", (line) => this.handleLine(line));
@@ -234,6 +262,10 @@ export class ComputerNativeHost {
     const isCurrentSocket = transport === this.socket;
     const isCurrentChild = transport === this.child;
     if (!isCurrentSocket && !isCurrentChild) return;
+    this.generation += 1;
+    const cancelStarting = this.cancelStarting;
+    this.cancelStarting = null;
+    cancelStarting?.(error);
     if (isCurrentSocket) this.socket = null;
     if (isCurrentChild) this.child = null;
     this.lines?.close();
@@ -243,6 +275,10 @@ export class ComputerNativeHost {
   }
 
   private reset(error: Error): void {
+    this.generation += 1;
+    const cancelStarting = this.cancelStarting;
+    this.cancelStarting = null;
+    cancelStarting?.(error);
     this.lines?.close();
     this.lines = null;
     this.socket?.destroy();
@@ -263,10 +299,10 @@ export class ComputerNativeHost {
     this.pending.clear();
   }
 
-  private cleanupSocketPath(): void {
-    if (!this.socketPath) return;
-    rmSync(this.socketPath, { force: true });
-    this.socketPath = null;
+  private cleanupSocketPath(target = this.socketPath): void {
+    if (!target) return;
+    rmSync(target, { force: true });
+    if (this.socketPath === target) this.socketPath = null;
   }
 
   private handleLine(line: string): void {

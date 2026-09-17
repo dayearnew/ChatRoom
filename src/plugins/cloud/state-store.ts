@@ -1,5 +1,12 @@
 import { generateKeyPairSync, randomUUID } from "node:crypto";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import {
@@ -55,12 +62,16 @@ export class CloudStateStore {
     const validated = stateSchema.parse(state);
     await mkdir(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
     const temporary = `${this.filePath}.${process.pid}.${randomUUID()}.tmp`;
-    await writeFile(temporary, `${JSON.stringify(validated, null, 2)}\n`, {
-      mode: 0o600,
-    });
-    await chmod(temporary, 0o600).catch(() => undefined);
-    await rename(temporary, this.filePath);
-    await chmod(this.filePath, 0o600).catch(() => undefined);
+    try {
+      await writeFile(temporary, `${JSON.stringify(validated, null, 2)}\n`, {
+        mode: 0o600,
+      });
+      await chmod(temporary, 0o600).catch(() => undefined);
+      await rename(temporary, this.filePath);
+      await chmod(this.filePath, 0o600).catch(() => undefined);
+    } finally {
+      await rm(temporary, { force: true }).catch(() => undefined);
+    }
   }
 }
 

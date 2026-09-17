@@ -2,6 +2,7 @@ import { Router } from "express";
 import { ChatRoomError } from "../../../core/errors/chatroom-error.js";
 import {
   asyncRoute,
+  bodyRecord,
   requireString,
 } from "../../../presentation/http/http-utils.js";
 import type { WebRuntime } from "../runtime.js";
@@ -139,12 +140,6 @@ export function createWorkspaceApiRouter(application: WebRuntime): Router {
   );
 
   return router;
-}
-
-function bodyRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
 }
 
 function imageMime(filePath: string): string | null {

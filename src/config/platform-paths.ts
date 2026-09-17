@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 
-export interface PlatformPaths {
+interface PlatformPaths {
   configFile: string;
   dataDir: string;
   databaseFile: string;

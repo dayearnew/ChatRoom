@@ -13,8 +13,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://127.0.0.1:8765",
-      "/mcp": "http://127.0.0.1:8765",
+      "^/api(?:/|$)": "http://127.0.0.1:8765",
+      "^/mcp(?:/|$)": "http://127.0.0.1:8765",
     },
   },
 });

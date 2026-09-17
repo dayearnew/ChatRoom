@@ -28,7 +28,7 @@ const locale = useLocale();
         <template #activator="{ props: activatorProps }">
           <v-btn
             v-bind="activatorProps"
-            prepend-icon="mdi-translate"
+            prepend-icon="$mdiTranslate"
             variant="text"
             size="small"
           >
@@ -47,6 +47,7 @@ const locale = useLocale();
             :icon="themeIcon"
             variant="text"
             size="small"
+            :aria-label="locale.t('$vuetify.chatroom.common.theme')"
           />
         </template>
         <v-list density="compact">
@@ -83,7 +84,7 @@ const locale = useLocale();
             block
             size="large"
             variant="tonal"
-            prepend-icon="mdi-fingerprint"
+            prepend-icon="$mdiFingerprint"
             :loading="passkeyBusy"
             @click="emit('passkeyLogin')"
           >
@@ -98,7 +99,7 @@ const locale = useLocale();
           v-model="token"
           type="password"
           :label="locale.t('$vuetify.chatroom.auth.ownerToken')"
-          prepend-inner-icon="mdi-key-outline"
+          prepend-inner-icon="$mdiKeyOutline"
           autocomplete="current-password"
           @keyup.enter="emit('login')"
         />

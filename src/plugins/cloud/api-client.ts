@@ -165,7 +165,7 @@ export class CloudApiClient {
   }
 }
 
-export interface DeviceIdentity {
+interface DeviceIdentity {
   installationId: string;
   devicePublicKey: string;
   devicePrivateKey: string;

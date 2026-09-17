@@ -2,13 +2,13 @@
 import { onMounted, ref, watch } from "vue";
 import { useLocale } from "vuetify";
 import { api, type WorkspaceEntry } from "../api.js";
+import { errorMessage } from "../utils/errors.js";
+import { createRequestGate } from "../utils/requests.js";
 import WorkspaceCreateDialog from "./WorkspaceCreateDialog.vue";
 import WorkspaceFilesPane from "./WorkspaceFilesPane.vue";
 import WorkspaceGitPane from "./WorkspaceGitPane.vue";
 import WorkspacePromptPane from "./WorkspacePromptPane.vue";
 import WorkspaceSkillsPane from "./WorkspaceSkillsPane.vue";
-
-defineProps<{ revision: number }>();
 
 const items = ref<WorkspaceEntry[]>([]);
 const allowedRoots = ref<string[]>([]);
@@ -22,6 +22,7 @@ const createOpen = ref(false);
 const creating = ref(false);
 const createError = ref("");
 const locale = useLocale();
+const loadRequests = createRequestGate();
 
 onMounted(() => void load());
 watch(selectedRoot, (root) => {
@@ -30,21 +31,23 @@ watch(selectedRoot, (root) => {
 });
 
 async function load() {
+  const request = loadRequests.begin();
   loading.value = true;
   error.value = "";
   try {
     const [workspaces, roots] = await Promise.all([
-      api<WorkspaceEntry[]>("/workspaces"),
-      api<string[]>("/workspace/roots"),
+      api<WorkspaceEntry[]>("/workspaces", { signal: request.signal }),
+      api<string[]>("/workspace/roots", { signal: request.signal }),
     ]);
+    if (!loadRequests.isCurrent(request)) return;
     items.value = workspaces;
     allowedRoots.value = roots;
     if (!items.value.some((item) => item.root === selectedRoot.value))
       selectedRoot.value = items.value[0]?.root ?? null;
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : String(cause);
+    if (loadRequests.isCurrent(request)) error.value = errorMessage(cause);
   } finally {
-    loading.value = false;
+    if (loadRequests.isCurrent(request)) loading.value = false;
   }
 }
 
@@ -60,7 +63,7 @@ async function createProject(parent: string, name: string) {
     selectedRoot.value = created.root;
     createOpen.value = false;
   } catch (cause) {
-    createError.value = cause instanceof Error ? cause.message : String(cause);
+    createError.value = errorMessage(cause);
   } finally {
     creating.value = false;
   }
@@ -81,7 +84,7 @@ async function createProject(parent: string, name: string) {
             density="compact"
             variant="outlined"
             hide-details
-            prepend-inner-icon="mdi-folder-outline"
+            prepend-inner-icon="$mdiFolderOutline"
             class="workspace-switcher"
           />
           <div class="workspace-meta-row">
@@ -94,7 +97,7 @@ async function createProject(parent: string, name: string) {
             </div>
             <div class="workspace-actions">
               <v-btn
-                icon="mdi-plus"
+                icon="$mdiPlus"
                 size="small"
                 variant="text"
                 :aria-label="
@@ -106,7 +109,7 @@ async function createProject(parent: string, name: string) {
                 "
               />
               <v-btn
-                icon="mdi-refresh"
+                icon="$mdiRefresh"
                 size="small"
                 variant="text"
                 :loading="loading"
@@ -137,7 +140,7 @@ async function createProject(parent: string, name: string) {
         </v-tabs>
         <v-divider />
 
-        <v-window v-model="tab">
+        <v-window v-model="tab" :touch="false">
           <v-window-item value="git">
             <WorkspaceGitPane :root="selectedRoot" />
           </v-window-item>
@@ -155,7 +158,7 @@ async function createProject(parent: string, name: string) {
 
       <v-empty-state
         v-else-if="!loading"
-        icon="mdi-folder-outline"
+        icon="$mdiFolderOutline"
         :title="locale.t('$vuetify.chatroom.workspaces.empty')"
       />
     </v-card>

@@ -1,4 +1,4 @@
-export interface BoundedValue<T = unknown> {
+interface BoundedValue<T = unknown> {
   value: T;
   truncated: boolean;
 }

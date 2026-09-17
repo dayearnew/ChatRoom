@@ -1,11 +1,6 @@
 <script setup lang="ts">
+import type { PasskeySummary } from "../api.js";
 import { useLocale } from "vuetify";
-
-interface PasskeySummary {
-  id: string;
-  name: string;
-  lastUsedAt: string;
-}
 
 defineProps<{ passkeys: PasskeySummary[]; busy: boolean; error: string }>();
 const emit = defineEmits<{ add: []; remove: [id: string] }>();
@@ -27,9 +22,10 @@ const locale = useLocale();
           </div>
         </div>
         <v-btn
-          icon="mdi-close"
+          icon="$mdiClose"
           variant="text"
           size="small"
+          :aria-label="locale.t('$vuetify.chatroom.common.close')"
           @click="open = false"
         />
       </div>
@@ -39,12 +35,12 @@ const locale = useLocale();
           <v-text-field
             v-model="name"
             :label="locale.t('$vuetify.chatroom.auth.passkeyName')"
-            prepend-inner-icon="mdi-laptop"
+            prepend-inner-icon="$mdiLaptop"
           />
           <v-btn
             color="primary"
             variant="flat"
-            prepend-icon="mdi-fingerprint"
+            prepend-icon="$mdiFingerprint"
             :loading="busy"
             @click="emit('add')"
           >
@@ -62,7 +58,7 @@ const locale = useLocale();
         </v-alert>
         <div v-if="passkeys.length" class="passkey-list">
           <div v-for="item in passkeys" :key="item.id" class="passkey-row">
-            <v-icon icon="mdi-fingerprint" size="20" />
+            <v-icon icon="$mdiFingerprint" size="20" />
             <div class="passkey-row-main">
               <div class="font-weight-medium">{{ item.name }}</div>
               <div class="text-caption muted">
@@ -71,7 +67,7 @@ const locale = useLocale();
               </div>
             </div>
             <v-btn
-              icon="mdi-delete-outline"
+              icon="$mdiDeleteOutline"
               variant="text"
               size="small"
               :aria-label="locale.t('$vuetify.chatroom.auth.removePasskey')"

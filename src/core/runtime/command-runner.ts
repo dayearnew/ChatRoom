@@ -10,7 +10,7 @@ export interface CommandRequest {
   timeoutMs?: number;
 }
 
-export interface CommandResult {
+interface CommandResult {
   stdout: string;
   stderr: string;
   exitCode: number;

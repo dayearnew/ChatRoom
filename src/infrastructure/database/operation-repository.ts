@@ -89,24 +89,17 @@ export class OperationRepository implements OperationRepositoryPort {
   }
 
   clearHistory(): { deleted: number; preserved: number } {
-    const before = (
+    const deleted = Number(
       this.database.raw
-        .prepare("SELECT COUNT(*) AS count FROM operations")
-        .get() as {
-        count: number;
-      }
-    ).count;
-    this.database.raw
-      .prepare("DELETE FROM operations WHERE status != 'running'")
-      .run();
+        .prepare("DELETE FROM operations WHERE status != 'running'")
+        .run().changes,
+    );
     const preserved = (
       this.database.raw
         .prepare("SELECT COUNT(*) AS count FROM operations")
-        .get() as {
-        count: number;
-      }
+        .get() as { count: number }
     ).count;
-    return { deleted: before - preserved, preserved };
+    return { deleted, preserved };
   }
 }
 

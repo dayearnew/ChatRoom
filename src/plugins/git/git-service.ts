@@ -20,28 +20,14 @@ export class GitService {
   async status(cwd: string): Promise<GitStatus | null> {
     const root = await this.repositoryRoot(cwd);
     if (!root) return null;
-    const [branch, head, porcelain] = await Promise.all([
-      this.branch(root),
-      this.head(root),
-      this.run(root, [
-        "status",
-        "--porcelain=v1",
-        "-z",
-        "--untracked-files=all",
-      ]),
+    const result = await this.run(root, [
+      "status",
+      "--porcelain=v2",
+      "--branch",
+      "-z",
+      "--untracked-files=all",
     ]);
-    const upstream = head ? await this.upstream(root) : null;
-    const { ahead, behind } = upstream
-      ? await this.aheadBehind(root)
-      : { ahead: 0, behind: 0 };
-    return {
-      branch,
-      head,
-      upstream,
-      ahead,
-      behind,
-      changes: parseStatus(porcelain.stdout),
-    };
+    return parseStatus(result.stdout);
   }
 
   async diff(
@@ -300,49 +286,6 @@ export class GitService {
     return head;
   }
 
-  private async branch(cwd: string): Promise<string | null> {
-    return (
-      (await this.run(cwd, ["branch", "--show-current"])).stdout.trim() || null
-    );
-  }
-
-  private async upstream(cwd: string): Promise<string | null> {
-    try {
-      return (
-        (
-          await this.run(cwd, [
-            "rev-parse",
-            "--abbrev-ref",
-            "--symbolic-full-name",
-            "@{upstream}",
-          ])
-        ).stdout.trim() || null
-      );
-    } catch {
-      return null;
-    }
-  }
-
-  private async aheadBehind(
-    cwd: string,
-  ): Promise<{ ahead: number; behind: number }> {
-    try {
-      const [ahead = "0", behind = "0"] = (
-        await this.run(cwd, [
-          "rev-list",
-          "--left-right",
-          "--count",
-          "HEAD...@{upstream}",
-        ])
-      ).stdout
-        .trim()
-        .split(/\s+/);
-      return { ahead: Number(ahead) || 0, behind: Number(behind) || 0 };
-    } catch {
-      return { ahead: 0, behind: 0 };
-    }
-  }
-
   private async relatedPaths(cwd: string, paths: string[]): Promise<string[]> {
     const normalized = normalizePaths(paths);
     const status = await this.requireStatus(cwd);
@@ -398,30 +341,105 @@ export class GitService {
   }
 }
 
-function parseStatus(output: string): GitChange[] {
-  const fields = output.split("\0");
+function parseStatus(output: string): GitStatus {
+  let branch: string | null = null;
+  let head: string | null = null;
+  let upstream: string | null = null;
+  let ahead = 0;
+  let behind = 0;
   const changes: GitChange[] = [];
-  for (let index = 0; index < fields.length; index++) {
-    const record = fields[index];
-    if (!record || record.length < 3) continue;
-    const indexStatus = record[0] ?? " ";
-    const workingTreeStatus = record[1] ?? " ";
-    const currentPath = record.slice(3);
-    let originalPath: string | null = null;
-    if (
-      ["R", "C"].includes(indexStatus) ||
-      ["R", "C"].includes(workingTreeStatus)
-    )
-      originalPath = fields[++index] || null;
-    changes.push({
-      path: currentPath,
-      originalPath,
-      indexStatus,
-      workingTreeStatus,
-      kind: changeKind(indexStatus, workingTreeStatus),
-    });
+  const records = output.split("\0");
+
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    if (!record) continue;
+    if (record.startsWith("# branch.oid ")) {
+      const value = record.slice("# branch.oid ".length);
+      head = value === "(initial)" ? null : value || null;
+      continue;
+    }
+    if (record.startsWith("# branch.head ")) {
+      const value = record.slice("# branch.head ".length);
+      branch = value === "(detached)" ? null : value || null;
+      continue;
+    }
+    if (record.startsWith("# branch.upstream ")) {
+      upstream = record.slice("# branch.upstream ".length) || null;
+      continue;
+    }
+    if (record.startsWith("# branch.ab ")) {
+      const match = /^\+(\d+) -(\d+)$/.exec(
+        record.slice("# branch.ab ".length),
+      );
+      if (match) {
+        ahead = Number(match[1]);
+        behind = Number(match[2]);
+      }
+      continue;
+    }
+
+    const type = record[0];
+    if (type === "?") {
+      changes.push({
+        path: record.slice(2),
+        originalPath: null,
+        indexStatus: "?",
+        workingTreeStatus: "?",
+        kind: "untracked",
+      });
+      continue;
+    }
+    if (type === "!") continue;
+
+    const fields = record.split(" ");
+    if (type === "1" && fields.length >= 9) {
+      pushTrackedChange(changes, fields[1]!, fields.slice(8).join(" "), null);
+      continue;
+    }
+    if (type === "2" && fields.length >= 10) {
+      const originalPath = records[++index] || null;
+      pushTrackedChange(
+        changes,
+        fields[1]!,
+        fields.slice(9).join(" "),
+        originalPath,
+      );
+      continue;
+    }
+    if (type === "u" && fields.length >= 11) {
+      pushTrackedChange(changes, fields[1]!, fields.slice(10).join(" "), null);
+    }
   }
-  return changes.sort((a, b) => a.path.localeCompare(b.path));
+
+  return {
+    branch,
+    head,
+    upstream,
+    ahead,
+    behind,
+    changes: changes.sort((a, b) => a.path.localeCompare(b.path)),
+  };
+}
+
+function pushTrackedChange(
+  changes: GitChange[],
+  xy: string,
+  filePath: string,
+  originalPath: string | null,
+): void {
+  const indexStatus = normalizePorcelainStatus(xy[0]);
+  const workingTreeStatus = normalizePorcelainStatus(xy[1]);
+  changes.push({
+    path: filePath,
+    originalPath,
+    indexStatus,
+    workingTreeStatus,
+    kind: changeKind(indexStatus, workingTreeStatus),
+  });
+}
+
+function normalizePorcelainStatus(value: string | undefined): string {
+  return !value || value === "." ? " " : value;
 }
 
 function changeKind(

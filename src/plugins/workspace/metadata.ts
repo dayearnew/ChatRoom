@@ -20,22 +20,24 @@ export function readInstructions(fs: WorkspaceFs): Promise<string | null> {
 }
 
 export async function readSkills(fs: WorkspaceFs): Promise<WorkspaceSkill[]> {
-  const paths: string[] = [];
-  for (const root of SKILL_ROOTS) {
-    try {
-      const entries = await fs.list(root, {
-        recursive: true,
-        maxEntries: 2000,
-      });
-      for (const entry of entries) {
-        if (entry.type === "file" && entry.path.endsWith("/SKILL.md"))
-          paths.push(entry.path);
-      }
-    } catch (error) {
-      if (!(error instanceof ChatRoomError) || error.code !== "NOT_FOUND")
+  const entriesByRoot = await Promise.all(
+    SKILL_ROOTS.map(async (root) => {
+      try {
+        return await fs.list(root, { recursive: true, maxEntries: 2000 });
+      } catch (error) {
+        if (error instanceof ChatRoomError && error.code === "NOT_FOUND")
+          return [];
         throw error;
-    }
-  }
+      }
+    }),
+  );
+  const paths = entriesByRoot.flatMap((entries) =>
+    entries
+      .filter(
+        (entry) => entry.type === "file" && entry.path.endsWith("/SKILL.md"),
+      )
+      .map((entry) => entry.path),
+  );
 
   return Promise.all(
     [...new Set(paths)].sort().map(async (skillPath) => {

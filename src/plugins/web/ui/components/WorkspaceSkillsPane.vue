@@ -2,12 +2,15 @@
 import { ref, watch } from "vue";
 import { useLocale } from "vuetify";
 import { api, type WorkspaceInfo, type WorkspaceSkill } from "../api.js";
+import { errorMessage } from "../utils/errors.js";
+import { createRequestGate } from "../utils/requests.js";
 
 const props = defineProps<{ root: string }>();
 const info = ref<WorkspaceInfo | null>(null);
 const loading = ref(false);
 const error = ref("");
 const locale = useLocale();
+const loadRequests = createRequestGate();
 
 watch(
   () => props.root,
@@ -16,16 +19,21 @@ watch(
 );
 
 async function load() {
+  const request = loadRequests.begin();
+  const root = props.root;
   loading.value = true;
   error.value = "";
   try {
-    info.value = await api<WorkspaceInfo>(
-      `/workspace?root=${encodeURIComponent(props.root)}`,
+    const next = await api<WorkspaceInfo>(
+      `/workspace?root=${encodeURIComponent(root)}`,
+      { signal: request.signal },
     );
+    if (!loadRequests.isCurrent(request) || props.root !== root) return;
+    info.value = next;
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : String(cause);
+    if (loadRequests.isCurrent(request)) error.value = errorMessage(cause);
   } finally {
-    loading.value = false;
+    if (loadRequests.isCurrent(request)) loading.value = false;
   }
 }
 
@@ -50,7 +58,7 @@ function sourceLabel(skill: WorkspaceSkill): string {
       >
         <div class="workspace-skill-header">
           <div class="workspace-skill-title">
-            <v-icon icon="mdi-puzzle-outline" size="18" />
+            <v-icon icon="$mdiPuzzleOutline" size="18" />
             <strong>{{ skill.name }}</strong>
           </div>
           <v-chip size="x-small" variant="tonal">
@@ -68,7 +76,7 @@ function sourceLabel(skill: WorkspaceSkill): string {
     </div>
     <v-empty-state
       v-else-if="!loading && !error"
-      icon="mdi-puzzle-outline"
+      icon="$mdiPuzzleOutline"
       :title="locale.t('$vuetify.chatroom.skills.empty')"
     />
   </div>

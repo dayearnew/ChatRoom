@@ -44,9 +44,10 @@ function submit() {
       <v-card-title class="d-flex align-center justify-space-between">
         <span>{{ locale.t("$vuetify.chatroom.workspaces.createTitle") }}</span>
         <v-btn
-          icon="mdi-close"
+          icon="$mdiClose"
           variant="text"
           size="small"
+          :aria-label="locale.t('$vuetify.chatroom.common.close')"
           @click="open = false"
         />
       </v-card-title>

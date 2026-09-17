@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useLocale } from "vuetify";
-import { api, type WorkspaceFile } from "../api.js";
+import { api, type WorkspaceFile, type WorkspaceFileContent } from "../api.js";
+import { errorMessage } from "../utils/errors.js";
+import { createRequestGate } from "../utils/requests.js";
 import { bytes } from "../utils.js";
 import CodeViewer from "./CodeViewer.vue";
 
@@ -17,6 +19,8 @@ const file = ref<FilePreview | null>(null);
 const loading = ref(false);
 const error = ref("");
 const locale = useLocale();
+const directoryRequests = createRequestGate();
+const previewRequests = createRequestGate();
 
 const entries = computed(() =>
   [...files.value].sort((a, b) => {
@@ -45,6 +49,8 @@ const parentPath = computed(() => {
 watch(
   () => props.root,
   () => {
+    directoryRequests.invalidate();
+    previewRequests.invalidate();
     currentPath.value = ".";
     file.value = null;
     void loadDirectory();
@@ -53,16 +59,27 @@ watch(
 );
 
 async function loadDirectory() {
+  const request = directoryRequests.begin();
+  const root = props.root;
+  const path = currentPath.value;
   loading.value = true;
   error.value = "";
   try {
-    files.value = await api<WorkspaceFile[]>(
-      `/workspace/files?root=${encodeURIComponent(props.root)}&path=${encodeURIComponent(currentPath.value)}`,
+    const next = await api<WorkspaceFile[]>(
+      `/workspace/files?root=${encodeURIComponent(root)}&path=${encodeURIComponent(path)}`,
+      { signal: request.signal },
     );
+    if (
+      !directoryRequests.isCurrent(request) ||
+      props.root !== root ||
+      currentPath.value !== path
+    )
+      return;
+    files.value = next;
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : String(cause);
+    if (directoryRequests.isCurrent(request)) error.value = errorMessage(cause);
   } finally {
-    loading.value = false;
+    if (directoryRequests.isCurrent(request)) loading.value = false;
   }
 }
 
@@ -73,6 +90,8 @@ async function navigate(path: string) {
 }
 
 async function openEntry(entry: WorkspaceFile) {
+  const request = previewRequests.begin();
+  const root = props.root;
   if (entry.type === "directory") {
     await navigate(entry.path);
     return;
@@ -85,7 +104,7 @@ async function openEntry(entry: WorkspaceFile) {
     file.value = {
       kind: "image",
       path: entry.path,
-      url: `/api/workspace/file/image?root=${encodeURIComponent(props.root)}&path=${encodeURIComponent(entry.path)}`,
+      url: `/api/workspace/file/image?root=${encodeURIComponent(root)}&path=${encodeURIComponent(entry.path)}`,
     };
     return;
   }
@@ -93,13 +112,16 @@ async function openEntry(entry: WorkspaceFile) {
     file.value = { kind: "unsupported", path: entry.path };
     return;
   }
+  error.value = "";
   try {
-    const result = await api<{ content: string }>(
-      `/workspace/file?root=${encodeURIComponent(props.root)}&path=${encodeURIComponent(entry.path)}`,
+    const result = await api<WorkspaceFileContent>(
+      `/workspace/file?root=${encodeURIComponent(root)}&path=${encodeURIComponent(entry.path)}`,
+      { signal: request.signal },
     );
+    if (!previewRequests.isCurrent(request) || props.root !== root) return;
     file.value = { kind: "text", path: entry.path, content: result.content };
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : String(cause);
+    if (previewRequests.isCurrent(request)) error.value = errorMessage(cause);
   }
 }
 
@@ -149,10 +171,11 @@ function isTextFile(filePath: string): boolean {
       <div class="workspace-file-browser">
         <div class="workspace-file-breadcrumbs">
           <v-btn
-            icon="mdi-arrow-up"
+            icon="$mdiArrowUp"
             size="x-small"
             variant="text"
             :disabled="parentPath === null"
+            :aria-label="locale.t('$vuetify.chatroom.files.parentDirectory')"
             @click="parentPath && navigate(parentPath)"
           />
           <div class="workspace-breadcrumb-items">
@@ -169,10 +192,11 @@ function isTextFile(filePath: string): boolean {
             </template>
           </div>
           <v-btn
-            icon="mdi-refresh"
+            icon="$mdiRefresh"
             size="x-small"
             variant="text"
             :loading="loading"
+            :aria-label="locale.t('$vuetify.chatroom.files.refresh')"
             @click="loadDirectory"
           />
         </div>
@@ -195,13 +219,13 @@ function isTextFile(filePath: string): boolean {
             "
             :prepend-icon="
               entry.type === 'directory'
-                ? 'mdi-folder-outline'
+                ? '$mdiFolderOutline'
                 : entry.type === 'symlink'
-                  ? 'mdi-link-variant'
-                  : 'mdi-file-outline'
+                  ? '$mdiLinkVariant'
+                  : '$mdiFileOutline'
             "
             :append-icon="
-              entry.type === 'directory' ? 'mdi-chevron-right' : undefined
+              entry.type === 'directory' ? '$mdiChevronRight' : undefined
             "
             @click="openEntry(entry)"
           />
@@ -228,13 +252,13 @@ function isTextFile(filePath: string): boolean {
         </v-sheet>
         <v-empty-state
           v-else-if="file?.kind === 'unsupported'"
-          icon="mdi-file-question-outline"
+          icon="$mdiFileQuestionOutline"
           :title="locale.t('$vuetify.chatroom.files.previewUnavailable')"
           :text="file.path"
         />
         <v-empty-state
           v-else
-          icon="mdi-file-eye-outline"
+          icon="$mdiFileEyeOutline"
           :title="locale.t('$vuetify.chatroom.files.select')"
           :text="locale.t('$vuetify.chatroom.files.readOnly')"
         />

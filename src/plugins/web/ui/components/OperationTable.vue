@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { useLocale } from "vuetify";
 import type { Operation } from "../api.js";
-import {
-  actionMessageKey,
-  humanizeAction,
-  sourceMessageKey,
-} from "../locales.js";
+import { useOperationLabels } from "../composables/useOperationLabels.js";
 import { clock, duration } from "../utils.js";
 import StateChip from "./StateChip.vue";
 
@@ -16,15 +12,7 @@ defineProps<{
 defineEmits<{ select: [event: Operation] }>();
 const locale = useLocale();
 
-function actionLabel(action: string): string {
-  const key = actionMessageKey(action);
-  return key ? locale.t(key) : humanizeAction(action);
-}
-
-function sourceLabel(source: string): string {
-  const key = sourceMessageKey(source);
-  return key ? locale.t(key) : source;
-}
+const { actionLabel, sourceLabel } = useOperationLabels();
 </script>
 
 <template>

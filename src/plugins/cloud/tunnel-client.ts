@@ -1,6 +1,7 @@
 import { createPrivateKey, sign } from "node:crypto";
 import http, { type ClientRequest, type IncomingMessage } from "node:http";
 import WebSocket from "ws";
+import { z } from "zod";
 import {
   cloudServiceForPublicService,
   type CloudLeaseState,
@@ -21,23 +22,39 @@ interface TunnelTimings {
 interface StreamState {
   request: ClientRequest;
   response: IncomingMessage | null;
+  backpressureTimer: NodeJS.Timeout | null;
 }
 
-type ControlMessage =
-  | { type: "challenge"; nonce: string }
-  | { type: "ready" }
-  | {
-      type: "open";
-      streamId: number;
-      service: PublicService;
-      method: string;
-      path: string;
-      headers: Record<string, string>;
-    }
-  | { type: "end"; streamId: number }
-  | { type: "abort"; streamId: number }
-  | { type: "pause"; streamId: number }
-  | { type: "resume"; streamId: number };
+const streamIdSchema = z.number().int().min(0).max(0xffff_ffff);
+const controlMessageSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("challenge"),
+      nonce: z.string().min(1),
+    })
+    .strict(),
+  z.object({ type: z.literal("ready") }).strict(),
+  z
+    .object({
+      type: z.literal("open"),
+      streamId: streamIdSchema,
+      service: z.enum(["mcp", "web"]),
+      method: z.string().min(1),
+      path: z.string().startsWith("/"),
+      headers: z.record(z.string(), z.string()),
+    })
+    .strict(),
+  z.object({ type: z.literal("end"), streamId: streamIdSchema }).strict(),
+  z.object({ type: z.literal("abort"), streamId: streamIdSchema }).strict(),
+  z.object({ type: z.literal("pause"), streamId: streamIdSchema }).strict(),
+  z.object({ type: z.literal("resume"), streamId: streamIdSchema }).strict(),
+]);
+
+type ControlMessage = z.infer<typeof controlMessageSchema>;
+
+export function parseTunnelControlMessage(input: string): ControlMessage {
+  return controlMessageSchema.parse(JSON.parse(input) as unknown);
+}
 
 export class CloudTunnelClient {
   private socket: WebSocket | null = null;
@@ -87,8 +104,7 @@ export class CloudTunnelClient {
     this.clearSocketTimers();
     this.socket?.close();
     this.socket = null;
-    for (const stream of this.streams.values()) stream.request.destroy();
-    this.streams.clear();
+    this.destroyAllStreams();
   }
 
   drainAndStop(): void {
@@ -136,7 +152,7 @@ export class CloudTunnelClient {
     socket.on("message", (data, isBinary) => {
       try {
         if (isBinary) this.handleBinary(Buffer.from(data as Buffer));
-        else this.handleControl(JSON.parse(data.toString()) as ControlMessage);
+        else this.handleControl(parseTunnelControlMessage(data.toString()));
       } catch (error) {
         this.callbacks.onError(
           error instanceof Error ? error : new Error(String(error)),
@@ -153,8 +169,7 @@ export class CloudTunnelClient {
         this.socket = null;
       }
       this.closeWhenIdle = null;
-      for (const stream of this.streams.values()) stream.request.destroy();
-      this.streams.clear();
+      this.destroyAllStreams();
       this.callbacks.onDisconnected();
       if (!this.stopped) this.scheduleReconnect();
     });
@@ -197,6 +212,8 @@ export class CloudTunnelClient {
   }
 
   private openStream(message: Extract<ControlMessage, { type: "open" }>): void {
+    if (this.streams.has(message.streamId))
+      throw new Error(`Duplicate tunnel stream id: ${message.streamId}`);
     const service = cloudServiceForPublicService(message.service);
     if (
       !this.acceptingServices.has(service) ||
@@ -230,20 +247,8 @@ export class CloudTunnelClient {
           headers: responseHeaders(response.headers),
         });
         response.on("data", (chunk: Buffer) => {
-          if (!this.sendBinary(message.streamId, Buffer.from(chunk))) {
-            response.pause();
-            const timer = setInterval(() => {
-              if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-                clearInterval(timer);
-                return;
-              }
-              if (this.socket.bufferedAmount <= LOW_WATER) {
-                clearInterval(timer);
-                response.resume();
-              }
-            }, 10);
-            timer.unref();
-          }
+          if (!this.sendBinary(message.streamId, Buffer.from(chunk)))
+            this.pauseForBackpressure(message.streamId, response);
         });
         response.on("end", () => {
           this.send({ type: "response-end", streamId: message.streamId });
@@ -268,10 +273,16 @@ export class CloudTunnelClient {
       this.send({ type: "response-end", streamId: message.streamId });
       this.finishStream(message.streamId);
     });
-    this.streams.set(message.streamId, { request, response: null });
+    this.streams.set(message.streamId, {
+      request,
+      response: null,
+      backpressureTimer: null,
+    });
   }
 
   private finishStream(streamId: number): void {
+    const stream = this.streams.get(streamId);
+    if (stream?.backpressureTimer) clearInterval(stream.backpressureTimer);
     this.streams.delete(streamId);
     if (this.streams.size !== 0 || !this.closeWhenIdle) return;
     const action = this.closeWhenIdle;
@@ -281,6 +292,37 @@ export class CloudTunnelClient {
       return;
     }
     this.socket?.close();
+  }
+
+  private pauseForBackpressure(
+    streamId: number,
+    response: IncomingMessage,
+  ): void {
+    response.pause();
+    const stream = this.streams.get(streamId);
+    if (!stream || stream.backpressureTimer) return;
+    stream.backpressureTimer = setInterval(() => {
+      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        if (stream.backpressureTimer) clearInterval(stream.backpressureTimer);
+        stream.backpressureTimer = null;
+        return;
+      }
+      if (this.socket.bufferedAmount <= LOW_WATER) {
+        if (stream.backpressureTimer) clearInterval(stream.backpressureTimer);
+        stream.backpressureTimer = null;
+        response.resume();
+      }
+    }, 10);
+    stream.backpressureTimer.unref();
+  }
+
+  private destroyAllStreams(): void {
+    for (const stream of this.streams.values()) {
+      if (stream.backpressureTimer) clearInterval(stream.backpressureTimer);
+      stream.request.destroy();
+      stream.response?.destroy();
+    }
+    this.streams.clear();
   }
 
   private handleBinary(frame: Buffer): void {

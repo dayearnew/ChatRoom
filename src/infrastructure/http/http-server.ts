@@ -4,6 +4,7 @@ import path from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import express, { type RequestHandler } from "express";
+import compression from "compression";
 import { toNodeHandler } from "@modelcontextprotocol/node";
 import type { AuthInfo, McpHttpHandler } from "@modelcontextprotocol/server";
 import type { ChatRoomConfig } from "../../config/types.js";
@@ -52,6 +53,7 @@ export class HttpServer {
     app.disable("x-powered-by");
     app.set("trust proxy", false);
     app.use(hostValidation(this.ingress));
+    app.use(compression({ threshold: 1024 }));
     app.use(express.json({ limit: "2mb" }));
     app.use(express.urlencoded({ extended: false, limit: "64kb" }));
     app.use(createOAuthRouter(this.auth, this.ingress));
@@ -179,7 +181,7 @@ function webMutationOrigin(ingress: IngressPolicy): RequestHandler {
 function hostValidation(ingress: IngressPolicy): RequestHandler {
   return (req, res, next) => {
     const hostname = req.hostname;
-    if (!hostname || !ingress.allowedHosts().has(hostname)) {
+    if (!hostname || !ingress.allowsHost(hostname)) {
       res.status(403).json({
         error: { code: "FORBIDDEN", message: "Host header is not allowed" },
       });

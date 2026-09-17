@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useLocale } from "vuetify";
-import { highlightSource } from "../syntax-highlight.js";
+
+const HIGHLIGHT_MAX_CHARS = 200_000;
+const SEARCH_DEBOUNCE_MS = 120;
 
 const props = withDefaults(
   defineProps<{
@@ -17,26 +19,61 @@ const props = withDefaults(
   },
 );
 const query = ref("");
+const effectiveQuery = ref("");
 const wrap = ref(true);
+const highlighted = shallowRef<string | null>(null);
 const locale = useLocale();
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+let highlightGeneration = 0;
+
 const source = computed(
   () => props.text ?? JSON.stringify(props.value ?? null, null, 2),
 );
 const display = computed(() => {
-  if (!query.value) return source.value;
+  const needle = effectiveQuery.value.toLocaleLowerCase();
+  if (!needle) return source.value;
   return source.value
     .split("\n")
-    .filter((line) =>
-      line.toLocaleLowerCase().includes(query.value.toLocaleLowerCase()),
-    )
+    .filter((line) => line.toLocaleLowerCase().includes(needle))
     .join("\n");
 });
-const highlighted = computed(() =>
-  highlightSource(display.value, {
-    filename: props.filename,
-    language: props.language ?? (props.value !== undefined ? "json" : null),
-  }),
+
+watch(query, (value) => {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    effectiveQuery.value = value;
+    searchTimer = null;
+  }, SEARCH_DEBOUNCE_MS);
+});
+
+watch(
+  [
+    display,
+    () => props.filename,
+    () => props.language,
+    () => props.value !== undefined,
+  ],
+  async () => {
+    const generation = ++highlightGeneration;
+    const text = display.value;
+    if (!text || text.length > HIGHLIGHT_MAX_CHARS) {
+      highlighted.value = null;
+      return;
+    }
+    const { highlightSource } = await import("../syntax-highlight.js");
+    if (generation !== highlightGeneration) return;
+    highlighted.value = highlightSource(text, {
+      filename: props.filename,
+      language: props.language ?? (props.value !== undefined ? "json" : null),
+    });
+  },
+  { immediate: true },
 );
+
+onBeforeUnmount(() => {
+  if (searchTimer) clearTimeout(searchTimer);
+  highlightGeneration += 1;
+});
 
 async function copy() {
   await navigator.clipboard.writeText(source.value);
@@ -66,30 +103,38 @@ function download() {
         <v-text-field
           v-model="query"
           :placeholder="locale.t('$vuetify.chatroom.code.search')"
-          prepend-inner-icon="mdi-magnify"
+          prepend-inner-icon="$mdiMagnify"
           density="compact"
           hide-details
           class="code-search"
-          max-width="220"
         />
         <v-spacer />
         <div class="code-actions">
           <v-btn
-            icon="mdi-content-copy"
+            icon="$mdiContentCopy"
             size="small"
             variant="text"
+            :aria-label="locale.t('$vuetify.chatroom.code.copy')"
             @click="copy"
           />
           <v-btn
-            :icon="wrap ? 'mdi-wrap' : 'mdi-format-align-left'"
+            :icon="wrap ? '$mdiWrap' : '$mdiFormatAlignLeft'"
             size="small"
             variant="text"
+            :aria-label="
+              locale.t(
+                wrap
+                  ? '$vuetify.chatroom.code.disableWrap'
+                  : '$vuetify.chatroom.code.enableWrap',
+              )
+            "
             @click="wrap = !wrap"
           />
           <v-btn
-            icon="mdi-download-outline"
+            icon="$mdiDownloadOutline"
             size="small"
             variant="text"
+            :aria-label="locale.t('$vuetify.chatroom.code.download')"
             @click="download"
           />
         </div>

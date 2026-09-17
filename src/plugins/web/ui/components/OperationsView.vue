@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useDisplay, useLocale } from "vuetify";
 import { api, type Operation } from "../api.js";
+import { errorMessage } from "../utils/errors.js";
+import { createRequestGate } from "../utils/requests.js";
 import OperationTable from "./OperationTable.vue";
 import OperationDetail from "./OperationDetail.vue";
 
@@ -14,13 +16,14 @@ const clearDialog = ref(false);
 const clearing = ref(false);
 const loadingMore = ref(false);
 const hasMore = ref(false);
+const error = ref("");
 const loadSentinel = ref<HTMLElement | null>(null);
 const locale = useLocale();
-const display = useDisplay();
-const compact = computed(() => display.width.value <= 1100);
+const { mdAndDown: compact } = useDisplay();
 const layout = ref<HTMLElement | null>(null);
 const PAGE_SIZE = 50;
-let loadGeneration = 0;
+const listRequests = createRequestGate();
+const detailRequests = createRequestGate();
 let loadObserver: IntersectionObserver | null = null;
 
 watch(filter, () => void loadInitial(), { immediate: true });
@@ -55,54 +58,70 @@ function operationsUrl(limit: number, offset = 0): string {
 }
 
 async function loadInitial() {
-  const generation = ++loadGeneration;
+  const request = listRequests.begin();
   loadingMore.value = true;
+  error.value = "";
   try {
-    const page = await api<Operation[]>(operationsUrl(PAGE_SIZE));
-    if (generation !== loadGeneration) return;
+    const page = await api<Operation[]>(operationsUrl(PAGE_SIZE), {
+      signal: request.signal,
+    });
+    if (!listRequests.isCurrent(request)) return;
     events.value = page;
     hasMore.value = page.length === PAGE_SIZE;
     if (selected.value) await loadDetail();
+  } catch (cause) {
+    if (listRequests.isCurrent(request)) error.value = errorMessage(cause);
   } finally {
-    if (generation === loadGeneration) loadingMore.value = false;
+    if (listRequests.isCurrent(request)) loadingMore.value = false;
   }
   await continueLoadingIfVisible();
 }
 
 async function loadMore() {
   if (loadingMore.value || !hasMore.value) return;
-  const generation = loadGeneration;
+  const request = listRequests.begin();
   const offset = events.value.length;
   loadingMore.value = true;
   try {
-    const page = await api<Operation[]>(operationsUrl(PAGE_SIZE, offset));
-    if (generation !== loadGeneration) return;
+    const page = await api<Operation[]>(operationsUrl(PAGE_SIZE, offset), {
+      signal: request.signal,
+    });
+    if (!listRequests.isCurrent(request)) return;
     events.value.push(...page);
     hasMore.value = page.length === PAGE_SIZE;
+  } catch (cause) {
+    if (listRequests.isCurrent(request)) error.value = errorMessage(cause);
   } finally {
-    if (generation === loadGeneration) loadingMore.value = false;
+    if (listRequests.isCurrent(request)) loadingMore.value = false;
   }
   await continueLoadingIfVisible();
 }
 
 async function refreshLoaded() {
-  const generation = ++loadGeneration;
+  const request = listRequests.begin();
   loadingMore.value = false;
+  error.value = "";
   const target = Math.max(events.value.length, PAGE_SIZE);
   const refreshed: Operation[] = [];
   let offset = 0;
-  while (refreshed.length < target) {
-    const limit = Math.min(500, target - refreshed.length);
-    const page = await api<Operation[]>(operationsUrl(limit, offset));
-    if (generation !== loadGeneration) return;
-    refreshed.push(...page);
-    if (page.length < limit) break;
-    offset += page.length;
+  try {
+    while (refreshed.length < target) {
+      const limit = Math.min(500, target - refreshed.length);
+      const page = await api<Operation[]>(operationsUrl(limit, offset), {
+        signal: request.signal,
+      });
+      if (!listRequests.isCurrent(request)) return;
+      refreshed.push(...page);
+      if (page.length < limit) break;
+      offset += page.length;
+    }
+    events.value = refreshed;
+    hasMore.value = refreshed.length >= target;
+    if (selected.value) await loadDetail();
+    await continueLoadingIfVisible();
+  } catch (cause) {
+    if (listRequests.isCurrent(request)) error.value = errorMessage(cause);
   }
-  events.value = refreshed;
-  hasMore.value = refreshed.length >= target;
-  if (selected.value) await loadDetail();
-  await continueLoadingIfVisible();
 }
 
 async function continueLoadingIfVisible() {
@@ -115,9 +134,21 @@ async function continueLoadingIfVisible() {
 }
 
 async function loadDetail() {
-  detail.value = selected.value
-    ? await api<Operation>(`/operations/${selected.value}`)
-    : null;
+  const request = detailRequests.begin();
+  const operationId = selected.value;
+  if (!operationId) {
+    detail.value = null;
+    return;
+  }
+  try {
+    const next = await api<Operation>(`/operations/${operationId}`, {
+      signal: request.signal,
+    });
+    if (detailRequests.isCurrent(request) && selected.value === operationId)
+      detail.value = next;
+  } catch (cause) {
+    if (detailRequests.isCurrent(request)) error.value = errorMessage(cause);
+  }
 }
 
 function select(event: Operation) {
@@ -136,14 +167,18 @@ function backToOperations() {
 
 async function clearHistory() {
   clearing.value = true;
+  error.value = "";
+  listRequests.invalidate();
+  detailRequests.invalidate();
+  loadingMore.value = false;
   try {
-    await api<{ deleted: number; preserved: number }>("/operations", {
-      method: "DELETE",
-    });
+    await api("/operations", { method: "DELETE" });
     selected.value = null;
     detail.value = null;
     clearDialog.value = false;
     await loadInitial();
+  } catch (cause) {
+    error.value = errorMessage(cause);
   } finally {
     clearing.value = false;
   }
@@ -167,25 +202,24 @@ async function clearHistory() {
             <v-btn-toggle
               v-model="filter"
               mandatory
-              density="compact"
-              variant="outlined"
+              variant="text"
               class="operation-filters"
             >
-              <v-btn value="all">{{
+              <v-btn value="all" size="small">{{
                 locale.t("$vuetify.chatroom.operations.all")
               }}</v-btn>
-              <v-btn value="running">{{
+              <v-btn value="running" size="small">{{
                 locale.t("$vuetify.chatroom.operations.running")
               }}</v-btn>
-              <v-btn value="error">{{
+              <v-btn value="error" size="small">{{
                 locale.t("$vuetify.chatroom.operations.errors")
               }}</v-btn>
-              <v-btn value="success">{{
+              <v-btn value="success" size="small">{{
                 locale.t("$vuetify.chatroom.operations.success")
               }}</v-btn>
             </v-btn-toggle>
             <v-btn
-              prepend-icon="mdi-delete-sweep-outline"
+              prepend-icon="$mdiDeleteSweepOutline"
               variant="text"
               size="small"
               class="operations-clear"
@@ -197,6 +231,9 @@ async function clearHistory() {
           </div>
         </div>
         <v-divider />
+        <v-alert v-if="error" type="error" variant="tonal" density="compact">
+          {{ error }}
+        </v-alert>
         <OperationTable
           :events="events"
           :selected="selected"
@@ -218,6 +255,14 @@ async function clearHistory() {
       </v-card>
     </div>
     <div v-if="!compact || selected" class="detail-pane">
+      <v-alert
+        v-if="compact && selected && error"
+        type="error"
+        variant="tonal"
+        density="compact"
+      >
+        {{ error }}
+      </v-alert>
       <OperationDetail
         :event="detail"
         :show-back="compact"

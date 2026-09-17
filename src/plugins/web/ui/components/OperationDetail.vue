@@ -2,12 +2,8 @@
 import { ref } from "vue";
 import { useLocale } from "vuetify";
 import type { Operation } from "../api.js";
-import {
-  actionMessageKey,
-  appIntlLocale,
-  humanizeAction,
-  sourceMessageKey,
-} from "../locales.js";
+import { useOperationLabels } from "../composables/useOperationLabels.js";
+import { appIntlLocale } from "../locales.js";
 import { dateTime } from "../utils.js";
 import CodeViewer from "./CodeViewer.vue";
 import StateChip from "./StateChip.vue";
@@ -17,15 +13,7 @@ defineEmits<{ back: [] }>();
 const tab = ref("input");
 const locale = useLocale();
 
-function actionLabel(action: string): string {
-  const key = actionMessageKey(action);
-  return key ? locale.t(key) : humanizeAction(action);
-}
-
-function sourceLabel(source: string): string {
-  const key = sourceMessageKey(source);
-  return key ? locale.t(key) : source;
-}
+const { actionLabel, sourceLabel } = useOperationLabels();
 
 function terminalText(value: unknown): string | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -46,7 +34,7 @@ function terminalText(value: unknown): string | null {
     <div class="panel-header operation-detail-header">
       <v-btn
         v-if="showBack"
-        icon="mdi-arrow-left"
+        icon="$mdiArrowLeft"
         size="small"
         variant="text"
         :aria-label="locale.t('$vuetify.chatroom.operations.back')"
@@ -97,7 +85,7 @@ function terminalText(value: unknown): string | null {
     </v-tabs>
     <v-divider />
 
-    <v-window v-model="tab">
+    <v-window v-model="tab" :touch="false">
       <v-window-item value="input" class="pa-3"
         ><CodeViewer :value="event.input"
       /></v-window-item>

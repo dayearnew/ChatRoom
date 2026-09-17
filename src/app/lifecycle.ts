@@ -18,9 +18,14 @@ export class ApplicationLifecycle {
       this.components = components;
       return components;
     } catch (error) {
-      await components.http.close().catch(() => undefined);
-      await components.plugins.stop().catch(() => undefined);
-      components.database.close();
+      try {
+        await cleanupComponents(components);
+      } catch (cleanupError) {
+        throw new AggregateError(
+          [error, cleanupError],
+          "Application startup failed and cleanup encountered errors",
+        );
+      }
       throw error;
     }
   }
@@ -34,9 +39,31 @@ export class ApplicationLifecycle {
   private async shutdownInternal(): Promise<void> {
     const components = this.components;
     if (!components) return;
-    await components.http.close();
-    await components.plugins.stop();
-    components.database.close();
     this.components = null;
+    await cleanupComponents(components);
   }
+}
+
+async function cleanupComponents(
+  components: ApplicationComponents,
+): Promise<void> {
+  const errors: unknown[] = [];
+  try {
+    await components.http.close();
+  } catch (error) {
+    errors.push(error);
+  }
+  try {
+    await components.plugins.stop();
+  } catch (error) {
+    errors.push(error);
+  }
+  try {
+    components.database.close();
+  } catch (error) {
+    errors.push(error);
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1)
+    throw new AggregateError(errors, "Application shutdown encountered errors");
 }

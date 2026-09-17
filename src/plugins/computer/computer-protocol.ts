@@ -19,14 +19,14 @@ export const COMPUTER_NATIVE_PROTOCOL_VERSION = 1;
 export type ComputerNativeMethod =
   "status" | "requestPermission" | "snapshot" | "action";
 
-export interface ComputerNativeResultMap {
+interface ComputerNativeResultMap {
   status: Omit<ComputerStatus, "settings">;
   requestPermission: Omit<ComputerStatus, "settings">;
   snapshot: ComputerSnapshot;
   action: ComputerActionResult;
 }
 
-export interface ComputerNativeError {
+interface ComputerNativeError {
   code?: string;
   message: string;
 }

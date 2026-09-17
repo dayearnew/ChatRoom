@@ -7,6 +7,8 @@ import {
   type ComputerStatus,
   type Operation,
 } from "../api.js";
+import { errorMessage } from "../utils/errors.js";
+import { createRequestGate } from "../utils/requests.js";
 
 type ComputerSettingKey = "enabled" | "remoteAccess";
 
@@ -20,6 +22,9 @@ export function useComputer(revision: () => number) {
   const settingsBusy = ref(false);
   const operationsBusy = ref(false);
   const permissionBusy = ref<ComputerPermission | null>(null);
+  const statusRequests = createRequestGate();
+  const previewRequests = createRequestGate();
+  const operationRequests = createRequestGate();
 
   const permissionRequestsAllowed = computed(() =>
     ["localhost", "127.0.0.1", "::1", "[::1]"].includes(
@@ -44,30 +49,40 @@ export function useComputer(revision: () => number) {
   }
 
   async function loadStatus(): Promise<void> {
+    const request = statusRequests.begin();
     try {
-      status.value = await api<ComputerStatus>("/computer/status");
+      const next = await api<ComputerStatus>("/computer/status", {
+        signal: request.signal,
+      });
+      if (statusRequests.isCurrent(request)) status.value = next;
     } catch (cause) {
-      captureError(cause);
+      if (statusRequests.isCurrent(request)) captureError(cause);
     }
   }
 
   async function loadOperations(): Promise<void> {
+    const request = operationRequests.begin();
     try {
-      operations.value = await api<Operation[]>(
+      const next = await api<Operation[]>(
         "/operations?pluginId=computer&limit=50",
+        { signal: request.signal },
       );
+      if (operationRequests.isCurrent(request)) operations.value = next;
     } catch (cause) {
-      captureError(cause);
+      if (operationRequests.isCurrent(request)) captureError(cause);
     }
   }
 
   async function loadPreview(): Promise<void> {
+    const request = previewRequests.begin();
     remotePreviewBlocked.value = false;
     try {
-      preview.value = await api<ComputerPreviewView | null>(
-        "/computer/preview",
-      );
+      const next = await api<ComputerPreviewView | null>("/computer/preview", {
+        signal: request.signal,
+      });
+      if (previewRequests.isCurrent(request)) preview.value = next;
     } catch (cause) {
+      if (!previewRequests.isCurrent(request)) return;
       if (isRemotePreviewBlocked(cause)) {
         preview.value = null;
         remotePreviewBlocked.value = true;
@@ -84,9 +99,15 @@ export function useComputer(revision: () => number) {
         status.value.permissions.screenRecording === "granted")
     )
       return;
+    const request = statusRequests.begin();
     try {
-      status.value = await api<ComputerStatus>("/computer/status");
-    } catch {}
+      const next = await api<ComputerStatus>("/computer/status", {
+        signal: request.signal,
+      });
+      if (statusRequests.isCurrent(request)) status.value = next;
+    } catch {
+      // Focus refresh is opportunistic; keep the last known permission state.
+    }
   }
 
   async function updateSetting(
@@ -95,6 +116,9 @@ export function useComputer(revision: () => number) {
   ): Promise<void> {
     settingsBusy.value = true;
     error.value = "";
+    statusRequests.invalidate();
+    previewRequests.invalidate();
+    operationRequests.invalidate();
     try {
       await api("/computer/settings", {
         method: "PATCH",
@@ -118,8 +142,10 @@ export function useComputer(revision: () => number) {
       permission === "accessibility"
         ? "/computer/permissions/accessibility/request"
         : "/computer/permissions/screen-recording/request";
+    statusRequests.invalidate();
     try {
-      status.value = await api<ComputerStatus>(endpoint, { method: "POST" });
+      const next = await api<ComputerStatus>(endpoint, { method: "POST" });
+      status.value = next;
     } catch (cause) {
       captureError(cause);
     } finally {
@@ -130,10 +156,12 @@ export function useComputer(revision: () => number) {
   async function refreshSnapshot(): Promise<void> {
     snapshotBusy.value = true;
     error.value = "";
+    previewRequests.invalidate();
     try {
-      preview.value = await api<ComputerPreviewView>("/computer/snapshot", {
+      const next = await api<ComputerPreviewView>("/computer/snapshot", {
         method: "POST",
       });
+      preview.value = next;
       await loadOperations();
     } catch (cause) {
       captureError(cause);
@@ -151,7 +179,7 @@ export function useComputer(revision: () => number) {
 
   function captureError(cause: unknown): void {
     if (!error.value) {
-      error.value = cause instanceof Error ? cause.message : String(cause);
+      error.value = errorMessage(cause);
     }
   }
 

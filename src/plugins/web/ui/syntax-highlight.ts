@@ -80,7 +80,7 @@ const basenameLanguages: Record<string, string> = {
   makefile: "bash",
 };
 
-export function languageForFilename(filename?: string): string | null {
+function languageForFilename(filename?: string): string | null {
   if (!filename) return null;
   const base = filename.split(/[\\/]/).pop()?.toLowerCase() ?? "";
   if (base === "package.json" || base === "tsconfig.json") return "json";

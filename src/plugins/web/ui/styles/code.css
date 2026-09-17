@@ -1,0 +1,135 @@
+.mono {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.muted {
+  color: rgb(var(--v-theme-on-surface), 0.56);
+}
+
+.min-w-0 {
+  min-width: 0;
+}
+
+.code-viewer-plain.v-sheet {
+  background: transparent;
+}
+
+.code-viewer-plain .code-block {
+  max-height: none;
+  padding: 0;
+  background: transparent;
+}
+
+.code-block code {
+  font: inherit;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: rgb(var(--v-theme-on-surface), 0.46);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-meta .hljs-keyword {
+  color: rgb(var(--v-theme-primary));
+}
+
+.hljs-string,
+.hljs-doctag,
+.hljs-regexp {
+  color: rgb(var(--v-theme-success));
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+  color: rgb(var(--v-theme-warning));
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: rgb(var(--v-theme-info));
+  font-weight: 600;
+}
+
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-built_in {
+  color: rgb(var(--v-theme-secondary));
+}
+
+.hljs-tag,
+.hljs-name,
+.hljs-attr,
+.hljs-attribute {
+  color: rgb(var(--v-theme-primary));
+}
+
+.hljs-meta,
+.hljs-variable,
+.hljs-template-variable {
+  color: rgb(var(--v-theme-on-surface), 0.74);
+}
+
+.hljs-addition {
+  color: rgb(var(--v-theme-success));
+}
+
+.hljs-deletion {
+  color: rgb(var(--v-theme-error));
+}
+
+.code-block {
+  margin: 0;
+  max-height: min(520px, 54dvh);
+  padding: 16px;
+  overflow: auto;
+  overscroll-behavior-inline: contain;
+  touch-action: pan-x pan-y;
+  background: rgb(var(--v-theme-surface-variant), 0.18);
+  font:
+    12px/1.6 "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    monospace;
+  white-space: pre;
+}
+
+.code-viewer.v-sheet {
+  border-color: rgb(var(--v-theme-outline), 0.1);
+}
+
+.code-toolbar {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+}
+
+.code-search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.code-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.code-actions .v-btn,
+.drawer-actions .v-btn {
+  min-width: 34px;
+  min-height: 34px;
+}
+
+.code-block.wrap {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

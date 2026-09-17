@@ -18,12 +18,12 @@ const color = computed(
 );
 const icon = computed(() =>
   props.value === "running"
-    ? "mdi-progress-clock"
+    ? "$mdiProgressClock"
     : props.value === "success" || props.value === "exited"
-      ? "mdi-check-circle-outline"
+      ? "$mdiCheckCircleOutline"
       : props.value === "error" || props.value === "failed"
-        ? "mdi-alert-circle-outline"
-        : "mdi-circle-outline",
+        ? "$mdiAlertCircleOutline"
+        : "$mdiCircleOutline",
 );
 const label = computed(() => {
   const key = statusMessageKey(props.value);

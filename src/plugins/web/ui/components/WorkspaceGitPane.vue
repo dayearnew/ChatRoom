@@ -1,231 +1,76 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { ref } from "vue";
 import { useLocale } from "vuetify";
-import {
-  api,
-  type GitBranch,
-  type GitChange,
-  type GitCommit,
-  type GitDiff,
-  type GitStatus,
-} from "../api.js";
+import type { GitBranch, GitChange } from "../api.js";
+import { useWorkspaceGit } from "../composables/useWorkspaceGit.js";
 import { appIntlLocale } from "../locales.js";
 import GitDiffViewer from "./GitDiffViewer.vue";
 
 const props = defineProps<{ root: string }>();
 const locale = useLocale();
-const status = ref<GitStatus | null>(null);
-const branches = ref<GitBranch[]>([]);
-const commits = ref<GitCommit[]>([]);
-const selectedPath = ref<string | null>(null);
-const diff = ref<GitDiff | null>(null);
-const loading = ref(false);
-const diffLoading = ref(false);
-const busy = ref<string | null>(null);
-const error = ref("");
+const git = useWorkspaceGit(() => props.root);
+const {
+  status,
+  branches,
+  commits,
+  selectedPath,
+  diff,
+  loading,
+  diffLoading,
+  busy,
+  error,
+  changes,
+  selectedChange,
+  stagedPaths,
+  unstagedPaths,
+  load,
+  stage,
+  unstage,
+  restore,
+  commit: commitGit,
+  createBranch: createGitBranch,
+  switchBranch: switchGitBranch,
+  deleteBranch,
+  remote,
+  isStaged,
+  isUnstaged,
+  statusCode,
+} = git;
+
 const commitMessage = ref("");
 const branchDialog = ref(false);
 const newBranch = ref("");
 const restoreTarget = ref<GitChange | null>(null);
 const deleteBranchTarget = ref<GitBranch | null>(null);
-let generation = 0;
-let diffGeneration = 0;
-
-const changes = computed(() => status.value?.changes ?? []);
-const selectedChange = computed(
-  () =>
-    changes.value.find((change) => change.path === selectedPath.value) ?? null,
-);
-const stagedPaths = computed(() =>
-  changes.value.filter(isStaged).map((change) => change.path),
-);
-const unstagedPaths = computed(() =>
-  changes.value.filter(isUnstaged).map((change) => change.path),
-);
-
-watch(
-  () => props.root,
-  () => {
-    selectedPath.value = null;
-    diff.value = null;
-    void load();
-  },
-  { immediate: true },
-);
-watch(selectedPath, () => void loadDiff());
-
-async function load() {
-  const current = ++generation;
-  loading.value = true;
-  error.value = "";
-  try {
-    const next = await api<GitStatus | null>(
-      `/git/status?root=${encodeURIComponent(props.root)}`,
-    );
-    if (current !== generation) return;
-    status.value = next;
-    if (!next) {
-      branches.value = [];
-      commits.value = [];
-      selectedPath.value = null;
-      diff.value = null;
-      return;
-    }
-    await loadAncillary(current);
-    normalizeSelection();
-    await loadDiff();
-  } catch (cause) {
-    if (current === generation)
-      error.value = cause instanceof Error ? cause.message : String(cause);
-  } finally {
-    if (current === generation) loading.value = false;
-  }
-}
-
-async function loadAncillary(current = generation) {
-  const encoded = encodeURIComponent(props.root);
-  const [nextBranches, nextCommits] = await Promise.all([
-    api<GitBranch[]>(`/git/branches?root=${encoded}`),
-    api<GitCommit[]>(`/git/log?root=${encoded}&limit=20`),
-  ]);
-  if (current !== generation) return;
-  branches.value = nextBranches;
-  commits.value = nextCommits;
-}
-
-async function loadDiff() {
-  const path = selectedPath.value;
-  if (!path || !status.value?.head) {
-    diff.value = null;
-    return;
-  }
-  const current = ++diffGeneration;
-  diffLoading.value = true;
-  try {
-    const next = await api<GitDiff>(
-      `/git/diff?root=${encodeURIComponent(props.root)}&path=${encodeURIComponent(path)}`,
-    );
-    if (current === diffGeneration) diff.value = next;
-  } catch (cause) {
-    if (current === diffGeneration) {
-      diff.value = null;
-      error.value = cause instanceof Error ? cause.message : String(cause);
-    }
-  } finally {
-    if (current === diffGeneration) diffLoading.value = false;
-  }
-}
-
-function normalizeSelection() {
-  if (!changes.value.some((change) => change.path === selectedPath.value))
-    selectedPath.value = changes.value[0]?.path ?? null;
-}
-
-function isStaged(change: GitChange): boolean {
-  return change.indexStatus !== " " && change.indexStatus !== "?";
-}
-
-function isUnstaged(change: GitChange): boolean {
-  return (
-    change.indexStatus === "?" ||
-    (change.workingTreeStatus !== " " && change.workingTreeStatus !== "?")
-  );
-}
-
-function statusCode(change: GitChange): string {
-  return `${change.indexStatus}${change.workingTreeStatus}`.replaceAll(
-    " ",
-    "·",
-  );
-}
-
-async function mutate(
-  key: string,
-  endpoint: string,
-  method: "POST" | "DELETE",
-  body: Record<string, unknown>,
-) {
-  busy.value = key;
-  error.value = "";
-  try {
-    status.value = await api<GitStatus>(endpoint, {
-      method,
-      body: JSON.stringify({ root: props.root, ...body }),
-    });
-    normalizeSelection();
-    await loadAncillary();
-    await loadDiff();
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : String(cause);
-    throw cause;
-  } finally {
-    busy.value = null;
-  }
-}
-
-async function stage(paths: string[]) {
-  if (!paths.length) return;
-  try {
-    await mutate("stage", "/git/stage", "POST", { paths });
-  } catch {}
-}
-
-async function unstage(paths: string[]) {
-  if (!paths.length) return;
-  try {
-    await mutate("unstage", "/git/unstage", "POST", { paths });
-  } catch {}
-}
 
 async function confirmRestore() {
   const target = restoreTarget.value;
-  if (!target) return;
-  try {
-    await mutate("restore", "/git/restore", "POST", { path: target.path });
-    restoreTarget.value = null;
-  } catch {}
+  if (target && (await restore(target.path))) restoreTarget.value = null;
 }
 
 async function commit() {
   const message = commitMessage.value.trim();
-  if (!message) return;
-  try {
-    await mutate("commit", "/git/commit", "POST", { message });
-    commitMessage.value = "";
-  } catch {}
+  if (message && (await commitGit(message))) commitMessage.value = "";
 }
 
 async function createBranch() {
   const name = newBranch.value.trim();
   if (!name) return;
-  try {
-    await mutate("branch", "/git/branches", "POST", { name });
+  if (await createGitBranch(name)) {
     newBranch.value = "";
     branchDialog.value = false;
-  } catch {}
+  }
 }
 
 async function switchBranch(branch: GitBranch) {
   if (branch.current) return;
-  try {
-    await mutate("branch", "/git/switch", "POST", { name: branch.name });
-    branchDialog.value = false;
-  } catch {}
+  if (await switchGitBranch(branch.name)) branchDialog.value = false;
 }
 
 async function confirmDeleteBranch() {
   const branch = deleteBranchTarget.value;
-  if (!branch) return;
-  try {
-    await mutate("branch", "/git/branches", "DELETE", { name: branch.name });
+  if (branch && (await deleteBranch(branch.name)))
     deleteBranchTarget.value = null;
-  } catch {}
-}
-
-async function remote(action: "fetch" | "pull" | "push") {
-  try {
-    await mutate(action, `/git/${action}`, "POST", {});
-  } catch {}
 }
 </script>
 
@@ -238,7 +83,7 @@ async function remote(action: "fetch" | "pull" | "push") {
 
     <v-empty-state
       v-if="!loading && !status"
-      icon="mdi-source-branch"
+      icon="$mdiSourceBranch"
       :title="locale.t('$vuetify.chatroom.git.notRepository')"
     />
 
@@ -264,14 +109,15 @@ async function remote(action: "fetch" | "pull" | "push") {
         </div>
         <div class="git-toolbar-actions">
           <v-btn
-            icon="mdi-refresh"
+            icon="$mdiRefresh"
             size="small"
             variant="text"
             :loading="loading"
+            :aria-label="locale.t('$vuetify.chatroom.git.refresh')"
             @click="load"
           />
           <v-btn
-            prepend-icon="mdi-source-branch"
+            prepend-icon="$mdiSourceBranch"
             size="small"
             variant="tonal"
             @click="branchDialog = true"
@@ -283,7 +129,7 @@ async function remote(action: "fetch" | "pull" | "push") {
             variant="text"
             :loading="busy === 'fetch'"
             @click="remote('fetch')"
-            >Fetch</v-btn
+            >{{ locale.t("$vuetify.chatroom.git.fetch") }}</v-btn
           >
           <v-btn
             size="small"
@@ -291,14 +137,14 @@ async function remote(action: "fetch" | "pull" | "push") {
             :disabled="!status.upstream"
             :loading="busy === 'pull'"
             @click="remote('pull')"
-            >Pull</v-btn
+            >{{ locale.t("$vuetify.chatroom.git.pull") }}</v-btn
           >
           <v-btn
             size="small"
             variant="text"
             :loading="busy === 'push'"
             @click="remote('push')"
-            >Push</v-btn
+            >{{ locale.t("$vuetify.chatroom.git.push") }}</v-btn
           >
         </div>
       </div>
@@ -404,7 +250,7 @@ async function remote(action: "fetch" | "pull" | "push") {
             <GitDiffViewer v-if="diff?.diff" :text="diff.diff" />
             <v-empty-state
               v-else-if="!diffLoading"
-              icon="mdi-file-compare"
+              icon="$mdiFileCompare"
               :title="
                 status.head
                   ? locale.t('$vuetify.chatroom.git.noDiff')
@@ -416,7 +262,7 @@ async function remote(action: "fetch" | "pull" | "push") {
       </div>
       <v-empty-state
         v-else
-        icon="mdi-check-circle-outline"
+        icon="$mdiCheckCircleOutline"
         :title="locale.t('$vuetify.chatroom.git.clean')"
       />
 
@@ -510,10 +356,11 @@ async function remote(action: "fetch" | "pull" | "push") {
                     {{ locale.t("$vuetify.chatroom.git.switch") }}
                   </v-btn>
                   <v-btn
-                    icon="mdi-delete-outline"
+                    icon="$mdiDeleteOutline"
                     size="x-small"
                     color="error"
                     variant="text"
+                    :aria-label="locale.t('$vuetify.chatroom.git.deleteBranch')"
                     @click="deleteBranchTarget = branch"
                   />
                 </template>

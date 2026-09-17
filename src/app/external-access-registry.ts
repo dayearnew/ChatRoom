@@ -8,9 +8,15 @@ export interface ExternalAccessState {
 }
 
 export class ExternalAccessRegistry {
+  private readonly selfHosted: ExternalAccessState;
   private cloud: ExternalAccessState = { mcpBaseUrl: null, webBaseUrl: null };
 
-  constructor(private readonly config: ChatRoomConfig["auth"]) {}
+  constructor(config: ChatRoomConfig["auth"]) {
+    this.selfHosted = normalizeState({
+      mcpBaseUrl: config.mcpPublicBaseUrl,
+      webBaseUrl: config.webPublicBaseUrl,
+    });
+  }
 
   setCloud(state: ExternalAccessState): void {
     this.cloud = normalizeState(state);
@@ -30,33 +36,25 @@ export class ExternalAccessRegistry {
     return this.baseUrlForHost(kind, hostname) !== null;
   }
 
-  hosts(): ReadonlySet<string> {
-    const hosts = new Set<string>();
-    for (const kind of ["mcp", "web"] as const)
-      for (const url of this.urls(kind)) hosts.add(new URL(url).hostname);
-    return hosts;
+  hasHost(hostname: string): boolean {
+    return this.matches("mcp", hostname) || this.matches("web", hostname);
   }
 
   private urls(kind: ExternalAccessKind): string[] {
-    const selfHosted =
-      kind === "mcp"
-        ? this.config.mcpPublicBaseUrl
-        : this.config.webPublicBaseUrl;
-    const cloud =
-      kind === "mcp" ? this.cloud.mcpBaseUrl : this.cloud.webBaseUrl;
-    return [selfHosted, cloud]
-      .filter((url): url is string => Boolean(url))
-      .map(normalizeUrl);
+    const key = kind === "mcp" ? "mcpBaseUrl" : "webBaseUrl";
+    return [this.selfHosted[key], this.cloud[key]].filter(
+      (url): url is string => url !== null,
+    );
   }
 }
 
 function normalizeState(state: ExternalAccessState): ExternalAccessState {
   return {
-    mcpBaseUrl: state.mcpBaseUrl ? normalizeUrl(state.mcpBaseUrl) : null,
-    webBaseUrl: state.webBaseUrl ? normalizeUrl(state.webBaseUrl) : null,
+    mcpBaseUrl: normalizeUrl(state.mcpBaseUrl),
+    webBaseUrl: normalizeUrl(state.webBaseUrl),
   };
 }
 
-function normalizeUrl(value: string): string {
-  return new URL(value).toString().replace(/\/$/, "");
+function normalizeUrl(value: string | null): string | null {
+  return value ? new URL(value).toString().replace(/\/$/, "") : null;
 }

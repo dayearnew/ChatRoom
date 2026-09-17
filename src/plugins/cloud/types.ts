@@ -61,7 +61,7 @@ export interface CloudPersistedState {
 }
 
 export interface CloudStatus {
-  installationId: string;
+  installationId: string | null;
   customerId: string | null;
   publicPrefix: string | null;
   desiredServices: Record<CloudServiceId, boolean>;

@@ -1,4 +1,5 @@
 import type { ChatRoomConfig } from "../../config/types.js";
+import { ChatRoomError } from "../../core/errors/chatroom-error.js";
 import { CloudApiClient } from "./api-client.js";
 import { CloudStateStore } from "./state-store.js";
 import { CloudTunnelClient } from "./tunnel-client.js";
@@ -20,7 +21,7 @@ interface ExternalAccessSink {
 export class CloudController {
   private readonly store: CloudStateStore;
   private readonly api: CloudApiClient;
-  private state!: CloudPersistedState;
+  private state: CloudPersistedState | null = null;
   private tunnel: CloudTunnelClient | null = null;
   private connection: CloudStatus["connection"] = "inactive";
   private lastError: string | null = null;
@@ -28,6 +29,7 @@ export class CloudController {
   private renewalTimer: NodeJS.Timeout | null = null;
   private statusRetryTimer: NodeJS.Timeout | null = null;
   private stopped = true;
+  private mutationQueue: Promise<unknown> = Promise.resolve();
 
   private constructor(
     private readonly config: ChatRoomConfig,
@@ -46,25 +48,39 @@ export class CloudController {
       process.env.CHATROOM_CLOUD_API ?? "https://chatroomcp.com"
     ).replace(/\/$/, "");
     const controller = new CloudController(config, apiBaseUrl, externalAccess);
-    controller.state = await controller.store.loadOrCreate();
-    controller.publishExternalAccess();
+    await controller.ensureState().catch(() => undefined);
     return controller;
   }
 
   status(): CloudStatus {
+    const state = this.state;
+    if (!state) {
+      return {
+        installationId: null,
+        customerId: null,
+        publicPrefix: null,
+        desiredServices: { remote_mcp: false, remote_web: false },
+        entitlements: [],
+        managementSessionActive: false,
+        connection: "error",
+        mcpUrl: null,
+        webUrl: null,
+        lastError: this.lastError ?? "ChatRoom Cloud is unavailable",
+      };
+    }
     const lease =
-      this.state.lease && Date.parse(this.state.lease.expiresAt) > Date.now()
-        ? this.state.lease
+      state.lease && Date.parse(state.lease.expiresAt) > Date.now()
+        ? state.lease
         : null;
     return {
-      installationId: this.state.installationId,
-      customerId: this.state.customerId,
-      publicPrefix: this.state.publicPrefix,
-      desiredServices: { ...this.state.desiredServices },
-      entitlements: [...this.state.entitlements],
+      installationId: state.installationId,
+      customerId: state.customerId,
+      publicPrefix: state.publicPrefix,
+      desiredServices: { ...state.desiredServices },
+      entitlements: [...state.entitlements],
       managementSessionActive: Boolean(
-        this.state.managementSession &&
-        Date.parse(this.state.managementSession.expiresAt) > Date.now(),
+        state.managementSession &&
+        Date.parse(state.managementSession.expiresAt) > Date.now(),
       ),
       connection: this.connection,
       mcpUrl: lease?.mcpBaseUrl ? `${lease.mcpBaseUrl}/mcp` : null,
@@ -73,64 +89,129 @@ export class CloudController {
     };
   }
 
-  async start(): Promise<void> {
-    if (!this.stopped) return;
-    this.stopped = false;
-    await this.syncStatus().catch((error) => {
-      this.setError(error);
-      this.scheduleStatusRetry();
+  start(): Promise<void> {
+    return this.serial(async () => {
+      if (!this.stopped) return;
+      this.stopped = false;
+      if (!this.state) return;
+      await this.syncStatusInternal().catch((error) => {
+        this.setError(error);
+        this.scheduleStatusRetry();
+      });
+      this.scheduleManagementSync();
     });
-    this.scheduleManagementSync();
   }
 
-  async stop(): Promise<void> {
+  stop(): Promise<void> {
     this.stopped = true;
-    if (this.managementTimer) clearTimeout(this.managementTimer);
-    if (this.renewalTimer) clearTimeout(this.renewalTimer);
-    if (this.statusRetryTimer) clearTimeout(this.statusRetryTimer);
-    this.managementTimer = null;
-    this.renewalTimer = null;
-    this.statusRetryTimer = null;
-    this.tunnel?.stop();
-    this.tunnel = null;
-    this.externalAccess?.clearCloud();
-    if (this.state.lease) this.connection = "disconnected";
+    this.clearTimers();
+    return this.serial(async () => {
+      this.tunnel?.stop();
+      this.tunnel = null;
+      this.externalAccess?.clearCloud();
+      if (this.state?.lease) this.connection = "disconnected";
+    });
   }
 
-  async managementUrl(): Promise<{ url: string; expiresAt: string }> {
-    const current = this.state.managementSession;
-    if (current && Date.parse(current.expiresAt) > Date.now()) {
-      return { url: current.managementUrl, expiresAt: current.expiresAt };
-    }
-    const session = await this.api.createManagementSession(this.identity());
-    this.state = {
-      ...this.state,
-      managementSession: {
-        purchaseToken: session.purchaseToken,
-        managementUrl: session.managementUrl,
-        expiresAt: session.expiresAt,
-      },
-    };
-    await this.store.save(this.state);
-    this.scheduleManagementSync(0);
-    return { url: session.managementUrl, expiresAt: session.expiresAt };
+  managementUrl(): Promise<{ url: string; expiresAt: string }> {
+    return this.serial(async () => {
+      const state = await this.ensureState();
+      const current = state.managementSession;
+      if (current && Date.parse(current.expiresAt) > Date.now()) {
+        return { url: current.managementUrl, expiresAt: current.expiresAt };
+      }
+      const session = await this.api.createManagementSession(this.identity());
+      this.state = {
+        ...state,
+        managementSession: {
+          purchaseToken: session.purchaseToken,
+          managementUrl: session.managementUrl,
+          expiresAt: session.expiresAt,
+        },
+      };
+      await this.store.save(this.state);
+      this.scheduleManagementSync(0);
+      return { url: session.managementUrl, expiresAt: session.expiresAt };
+    });
   }
 
-  async syncStatus(): Promise<CloudStatus> {
+  syncStatus(): Promise<CloudStatus> {
+    return this.serial(() => this.syncStatusInternal());
+  }
+
+  restore(
+    recoveryKey: string,
+  ): Promise<{ status: CloudStatus; recoveryKey: string }> {
+    return this.serial(async () => {
+      const state = await this.ensureState();
+      const previousEntitlements = state.entitlements;
+      const result = await this.api.restore(this.identity(), recoveryKey);
+      this.state = {
+        ...state,
+        customerId: result.customer.id,
+        publicPrefix: result.publicPrefix,
+        desiredServices: enableNewlyPurchasedServices(
+          state.desiredServices,
+          previousEntitlements.map((entry) => entry.service),
+          result.entitlements.map((entry) => entry.service),
+        ),
+        entitlements: result.entitlements,
+        lease: null,
+      };
+      await this.store.save(this.state);
+      this.tunnel?.stop();
+      this.tunnel = null;
+      if (!this.stopped) {
+        await this.refreshLeaseIfNeeded(true);
+        this.connectTunnel();
+        this.scheduleRenewal();
+      }
+      this.lastError = null;
+      return { status: this.status(), recoveryKey: result.recoveryKey };
+    });
+  }
+
+  async replaceRecoveryKey(): Promise<string> {
+    await this.ensureState();
+    const result = await this.api.replaceRecoveryKey(this.identity());
+    return result.recoveryKey;
+  }
+
+  setService(service: CloudServiceId, enabled: boolean): Promise<CloudStatus> {
+    return this.serial(async () => {
+      const state = await this.ensureState();
+      if (!CLOUD_SERVICES.includes(service))
+        throw new Error(`Unknown Cloud service: ${service}`);
+      this.state = {
+        ...state,
+        desiredServices: { ...state.desiredServices, [service]: enabled },
+      };
+      await this.store.save(this.state);
+      if (!this.stopped) {
+        await this.refreshLeaseIfNeeded(true);
+        this.connectTunnel();
+        this.scheduleRenewal();
+      }
+      this.lastError = null;
+      return this.status();
+    });
+  }
+
+  private async syncStatusInternal(): Promise<CloudStatus> {
+    const state = await this.ensureState();
     const managementSession = this.validManagementSession();
-    const previousEntitlements = this.state.entitlements;
-    const previousPrefix = this.state.publicPrefix;
+    const previousEntitlements = state.entitlements;
+    const previousPrefix = state.publicPrefix;
     const result = await this.api.status(
       this.identity(),
       managementSession?.purchaseToken ?? null,
     );
-    const nextCustomerId = result.customer?.id ?? null;
     this.state = {
-      ...this.state,
-      customerId: nextCustomerId,
+      ...state,
+      customerId: result.customer?.id ?? null,
       publicPrefix: result.publicPrefix,
       desiredServices: enableNewlyPurchasedServices(
-        this.state.desiredServices,
+        state.desiredServices,
         previousEntitlements.map((entry) => entry.service),
         result.entitlements.map((entry) => entry.service),
       ),
@@ -153,70 +234,15 @@ export class CloudController {
     return this.status();
   }
 
-  async restore(
-    recoveryKey: string,
-  ): Promise<{ status: CloudStatus; recoveryKey: string }> {
-    const previousEntitlements = this.state.entitlements;
-    const result = await this.api.restore(this.identity(), recoveryKey);
-    this.state = {
-      ...this.state,
-      customerId: result.customer.id,
-      publicPrefix: result.publicPrefix,
-      desiredServices: enableNewlyPurchasedServices(
-        this.state.desiredServices,
-        previousEntitlements.map((entry) => entry.service),
-        result.entitlements.map((entry) => entry.service),
-      ),
-      entitlements: result.entitlements,
-      lease: null,
-    };
-    await this.store.save(this.state);
-    this.tunnel?.stop();
-    this.tunnel = null;
-    if (!this.stopped) {
-      await this.refreshLeaseIfNeeded(true);
-      this.connectTunnel();
-      this.scheduleRenewal();
-    }
-    this.lastError = null;
-    return { status: this.status(), recoveryKey: result.recoveryKey };
-  }
-
-  async replaceRecoveryKey(): Promise<string> {
-    const result = await this.api.replaceRecoveryKey(this.identity());
-    return result.recoveryKey;
-  }
-
-  async setService(
-    service: CloudServiceId,
-    enabled: boolean,
-  ): Promise<CloudStatus> {
-    if (!CLOUD_SERVICES.includes(service))
-      throw new Error(`Unknown Cloud service: ${service}`);
-    this.state = {
-      ...this.state,
-      desiredServices: { ...this.state.desiredServices, [service]: enabled },
-    };
-    await this.store.save(this.state);
-    if (!this.stopped) {
-      await this.refreshLeaseIfNeeded(true);
-      this.connectTunnel();
-      this.scheduleRenewal();
-    }
-    this.lastError = null;
-    return this.status();
-  }
-
   private async refreshLeaseIfNeeded(force: boolean): Promise<void> {
-    const entitled = new Set(
-      this.state.entitlements.map((entry) => entry.service),
-    );
+    const state = this.requireState();
+    const entitled = new Set(state.entitlements.map((entry) => entry.service));
     const requested = CLOUD_SERVICES.filter(
-      (service) => this.state.desiredServices[service] && entitled.has(service),
+      (service) => state.desiredServices[service] && entitled.has(service),
     );
     if (requested.length === 0) {
-      if (this.state.lease) {
-        this.state = { ...this.state, lease: null };
+      if (state.lease) {
+        this.state = { ...state, lease: null };
         await this.store.save(this.state);
       }
       this.tunnel?.drainAndStop();
@@ -225,9 +251,9 @@ export class CloudController {
       this.publishExternalAccess();
       return;
     }
-    if (!this.state.publicPrefix) {
-      if (this.state.lease) {
-        this.state = { ...this.state, lease: null };
+    if (!state.publicPrefix) {
+      if (state.lease) {
+        this.state = { ...state, lease: null };
         await this.store.save(this.state);
       }
       this.tunnel?.drainAndStop();
@@ -236,7 +262,7 @@ export class CloudController {
       this.publishExternalAccess();
       return;
     }
-    const current = this.state.lease;
+    const current = state.lease;
     const sameServices =
       current &&
       requested.length === current.services.length &&
@@ -248,24 +274,25 @@ export class CloudController {
       return;
     }
     const lease = await this.api.lease(this.identity(), requested);
-    this.state = { ...this.state, lease };
+    this.state = { ...state, lease };
     await this.store.save(this.state);
     this.publishExternalAccess();
     this.tunnel?.updateLease(lease);
   }
 
   private connectTunnel(): void {
+    const state = this.state;
     if (
       this.stopped ||
       this.tunnel ||
-      !this.state.lease ||
-      this.state.lease.services.length === 0
+      !state?.lease ||
+      state.lease.services.length === 0
     )
       return;
     this.connection = "connecting";
     this.tunnel = new CloudTunnelClient(
-      this.state.lease,
-      { devicePrivateKey: this.state.devicePrivateKey },
+      state.lease,
+      { devicePrivateKey: state.devicePrivateKey },
       this.config.server,
       {
         onConnected: () => {
@@ -273,7 +300,7 @@ export class CloudController {
           this.connection = "connected";
         },
         onDisconnected: () => {
-          if (!this.stopped && this.state.lease)
+          if (!this.stopped && this.state?.lease)
             this.connection = "disconnected";
         },
         onError: (error) => this.setError(error),
@@ -283,7 +310,12 @@ export class CloudController {
   }
 
   private publishExternalAccess(): void {
-    const lease = this.state.lease;
+    const state = this.state;
+    if (!state) {
+      this.externalAccess?.clearCloud();
+      return;
+    }
+    const lease = state.lease;
     const activeLease =
       lease && Date.parse(lease.expiresAt) > Date.now() ? lease : null;
     this.externalAccess?.setCloud({
@@ -297,7 +329,7 @@ export class CloudController {
   }
 
   private scheduleStatusRetry(delayMs = 30_000): void {
-    if (this.stopped || this.statusRetryTimer) return;
+    if (this.stopped || !this.state || this.statusRetryTimer) return;
     this.statusRetryTimer = setTimeout(() => {
       this.statusRetryTimer = null;
       void this.syncStatus().catch((error) => {
@@ -324,7 +356,7 @@ export class CloudController {
   private scheduleRenewal(): void {
     if (this.renewalTimer) clearTimeout(this.renewalTimer);
     this.renewalTimer = null;
-    const lease = this.state.lease;
+    const lease = this.state?.lease;
     if (this.stopped || !lease) return;
     const remaining = Date.parse(lease.expiresAt) - Date.now();
     const delay = Math.max(
@@ -333,25 +365,77 @@ export class CloudController {
     );
     this.renewalTimer = setTimeout(() => {
       this.renewalTimer = null;
-      void this.refreshLeaseIfNeeded(true)
-        .then(() => this.connectTunnel())
+      void this.serial(async () => {
+        if (this.stopped) return;
+        await this.refreshLeaseIfNeeded(true);
+        this.connectTunnel();
+      })
         .catch((error) => this.setError(error))
         .finally(() => this.scheduleRenewal());
     }, delay);
     this.renewalTimer.unref();
   }
 
+  private clearTimers(): void {
+    if (this.managementTimer) clearTimeout(this.managementTimer);
+    if (this.renewalTimer) clearTimeout(this.renewalTimer);
+    if (this.statusRetryTimer) clearTimeout(this.statusRetryTimer);
+    this.managementTimer = null;
+    this.renewalTimer = null;
+    this.statusRetryTimer = null;
+  }
+
+  private serial<T>(action: () => Promise<T>): Promise<T> {
+    const next = this.mutationQueue.then(action, action);
+    this.mutationQueue = next.then(
+      () => undefined,
+      () => undefined,
+    );
+    return next;
+  }
+
   private validManagementSession() {
-    const value = this.state.managementSession;
+    const value = this.state?.managementSession;
     return value && Date.parse(value.expiresAt) > Date.now() ? value : null;
   }
 
   private identity() {
+    const state = this.requireState();
     return {
-      installationId: this.state.installationId,
-      devicePublicKey: this.state.devicePublicKey,
-      devicePrivateKey: this.state.devicePrivateKey,
+      installationId: state.installationId,
+      devicePublicKey: state.devicePublicKey,
+      devicePrivateKey: state.devicePrivateKey,
     };
+  }
+
+  private async ensureState(): Promise<CloudPersistedState> {
+    if (this.state) return this.state;
+    try {
+      this.state = await this.store.loadOrCreate();
+      this.lastError = null;
+      this.connection = "inactive";
+      this.publishExternalAccess();
+      return this.state;
+    } catch (error) {
+      this.externalAccess?.clearCloud();
+      const detail = error instanceof Error ? error.message : String(error);
+      this.lastError = `Cloud state unavailable: ${detail}`;
+      this.connection = "error";
+      throw new ChatRoomError(
+        "INTERNAL",
+        "ChatRoom Cloud is unavailable",
+        { reason: "cloud_state_unavailable" },
+        error instanceof Error ? { cause: error } : undefined,
+      );
+    }
+  }
+
+  private requireState(): CloudPersistedState {
+    if (!this.state)
+      throw new ChatRoomError("INTERNAL", "ChatRoom Cloud is unavailable", {
+        reason: "cloud_state_unavailable",
+      });
+    return this.state;
   }
 
   private setError(error: unknown): void {

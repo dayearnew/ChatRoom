@@ -1,9 +1,17 @@
 import { createVuetify } from "vuetify";
-import { mdi } from "vuetify/iconsets/mdi";
+import { aliases as mdiAliases, mdi } from "vuetify/iconsets/mdi-svg";
+import { chatroomIconAliases } from "./icons.js";
 import { chatroomLocaleMessages, initialAppLocale } from "./locales.js";
 
 export const vuetify = createVuetify({
-  icons: { defaultSet: "mdi", sets: { mdi } },
+  display: {
+    thresholds: { xs: 0, sm: 600, md: 960, lg: 1101, xl: 1920, xxl: 2560 },
+  },
+  icons: {
+    defaultSet: "mdi",
+    aliases: { ...mdiAliases, ...chatroomIconAliases },
+    sets: { mdi },
+  },
   locale: {
     locale: initialAppLocale(),
     fallback: "en",

@@ -11,20 +11,22 @@ export interface WebAuthnOrigin {
 }
 
 export class IngressPolicy {
+  private readonly staticHosts: ReadonlySet<string>;
+
   constructor(
     private readonly config: ChatRoomConfig,
     private readonly externalAccess: ExternalAccessRegistry,
-  ) {}
+  ) {
+    const hosts = new Set(["localhost", "127.0.0.1", "::1"]);
+    if (config.server.host !== "0.0.0.0" && config.server.host !== "::")
+      hosts.add(config.server.host);
+    this.staticHosts = hosts;
+  }
 
-  allowedHosts(): ReadonlySet<string> {
-    const allowed = new Set(["localhost", "127.0.0.1", "::1"]);
-    if (
-      this.config.server.host !== "0.0.0.0" &&
-      this.config.server.host !== "::"
-    )
-      allowed.add(this.config.server.host);
-    for (const host of this.externalAccess.hosts()) allowed.add(host);
-    return allowed;
+  allowsHost(hostname: string): boolean {
+    return (
+      this.staticHosts.has(hostname) || this.externalAccess.hasHost(hostname)
+    );
   }
 
   requiresWebAuth(req: Request): boolean {

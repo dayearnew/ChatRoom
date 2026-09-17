@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useDisplay, useLocale } from "vuetify";
-import { api, type ProcessSnapshot } from "../api.js";
+import { ApiError, api, type ProcessSnapshot } from "../api.js";
 import { appIntlLocale } from "../locales.js";
 import { dateTime, duration } from "../utils.js";
+import { errorMessage } from "../utils/errors.js";
+import { createRequestGate } from "../utils/requests.js";
 import CodeViewer from "./CodeViewer.vue";
 import StateChip from "./StateChip.vue";
 
@@ -11,10 +13,12 @@ const props = defineProps<{ revision: number }>();
 const items = ref<ProcessSnapshot[]>([]);
 const selected = ref<string | null>(null);
 const detail = ref<ProcessSnapshot | null>(null);
+const error = ref("");
 const locale = useLocale();
-const display = useDisplay();
-const compact = computed(() => display.width.value <= 1100);
+const { mdAndDown: compact } = useDisplay();
 const layout = ref<HTMLElement | null>(null);
+const listRequests = createRequestGate();
+const detailRequests = createRequestGate();
 const processOutput = computed(() => {
   if (!detail.value) return "";
   const stderr = detail.value.stderr
@@ -45,14 +49,49 @@ watch(
 watch(selected, () => void loadDetail());
 
 async function load() {
-  items.value = await api<ProcessSnapshot[]>("/processes");
-  if (selected.value) await loadDetail();
+  const request = listRequests.begin();
+  error.value = "";
+  try {
+    const next = await api<ProcessSnapshot[]>("/processes", {
+      signal: request.signal,
+    });
+    if (!listRequests.isCurrent(request)) return;
+    items.value = next;
+    if (
+      selected.value &&
+      !next.some((item) => item.processId === selected.value)
+    ) {
+      clearSelection();
+      return;
+    }
+    if (selected.value) await loadDetail();
+  } catch (cause) {
+    if (listRequests.isCurrent(request)) error.value = errorMessage(cause);
+  }
 }
 
 async function loadDetail() {
-  detail.value = selected.value
-    ? await api<ProcessSnapshot>(`/processes/${selected.value}`)
-    : null;
+  const request = detailRequests.begin();
+  const processId = selected.value;
+  if (!processId) {
+    detail.value = null;
+    return;
+  }
+  try {
+    const next = await api<ProcessSnapshot>(`/processes/${processId}`, {
+      signal: request.signal,
+    });
+    if (detailRequests.isCurrent(request) && selected.value === processId)
+      detail.value = next;
+  } catch (cause) {
+    if (!detailRequests.isCurrent(request)) return;
+    if (isStaleProcessError(cause)) {
+      clearSelection();
+      void load();
+      return;
+    }
+    error.value = errorMessage(cause);
+  }
 }
 
 function selectProcess(processId: string) {
@@ -64,16 +103,38 @@ function selectProcess(processId: string) {
   }
 }
 
-function backToProcesses() {
+function clearSelection() {
   selected.value = null;
   detail.value = null;
 }
 
+function backToProcesses() {
+  clearSelection();
+}
+
 async function stop(id: string, force: boolean) {
-  await api(`/processes/${id}/${force ? "kill" : "terminate"}`, {
-    method: "POST",
-  });
-  await load();
+  listRequests.invalidate();
+  detailRequests.invalidate();
+  error.value = "";
+  try {
+    await api(`/processes/${id}/${force ? "kill" : "terminate"}`, {
+      method: "POST",
+    });
+    await load();
+  } catch (cause) {
+    if (isStaleProcessError(cause)) {
+      await load();
+      return;
+    }
+    error.value = errorMessage(cause);
+  }
+}
+
+function isStaleProcessError(cause: unknown): boolean {
+  return (
+    cause instanceof ApiError &&
+    (cause.code === "NOT_FOUND" || cause.code === "CONFLICT")
+  );
 }
 </script>
 
@@ -92,36 +153,52 @@ async function stop(id: string, force: boolean) {
           </div>
         </div>
         <v-divider />
+        <div v-if="error" class="processes-error" role="alert">
+          <v-icon icon="$mdiAlertCircleOutline" size="18" />
+          <span>{{ error }}</span>
+        </div>
 
-        <div v-if="items.length" class="process-record-list">
-          <div class="process-record-header" aria-hidden="true">
-            <span>{{ locale.t("$vuetify.chatroom.processes.command") }}</span>
-            <span>{{ locale.t("$vuetify.chatroom.processes.arguments") }}</span>
-            <span>{{ locale.t("$vuetify.chatroom.processes.started") }}</span>
-            <span class="process-record-duration">{{
+        <div v-if="items.length" class="process-record-list" role="grid">
+          <div class="process-record-header" role="row">
+            <span role="columnheader">{{
+              locale.t("$vuetify.chatroom.processes.command")
+            }}</span>
+            <span role="columnheader">{{
+              locale.t("$vuetify.chatroom.processes.arguments")
+            }}</span>
+            <span role="columnheader">{{
+              locale.t("$vuetify.chatroom.processes.started")
+            }}</span>
+            <span class="process-record-duration" role="columnheader">{{
               locale.t("$vuetify.chatroom.processes.duration")
             }}</span>
-            <span class="process-record-state-heading">{{
+            <span role="columnheader">{{
               locale.t("$vuetify.chatroom.processes.state")
             }}</span>
           </div>
           <div
             v-for="item in items"
             :key="item.processId"
-            role="button"
+            role="row"
             tabindex="0"
             class="process-record-row"
             :class="{ 'selected-row': selected === item.processId }"
+            :aria-selected="selected === item.processId"
             @click="selectProcess(item.processId)"
             @keydown.enter="selectProcess(item.processId)"
             @keydown.space.prevent="selectProcess(item.processId)"
           >
             <div class="process-record-main">
-              <div class="process-record-command mono" :title="item.command">
+              <div
+                class="process-record-command mono"
+                role="gridcell"
+                :title="item.command"
+              >
                 {{ item.command }}
               </div>
               <div
                 class="process-record-args mono"
+                role="gridcell"
                 :class="{ muted: !item.args.length }"
                 :title="item.args.join(' ')"
               >
@@ -129,24 +206,19 @@ async function stop(id: string, force: boolean) {
               </div>
             </div>
             <div class="process-record-meta">
-              <div class="process-record-started">
+              <div class="process-record-started" role="gridcell">
                 {{
                   dateTime(item.startedAt, appIntlLocale(locale.current.value))
                 }}
               </div>
-              <div class="process-record-duration">
+              <div class="process-record-duration" role="gridcell">
                 {{ duration(item.durationMs) }}
               </div>
             </div>
-            <div class="process-record-side">
-              <StateChip :value="item.state" />
-              <div
-                v-if="item.state === 'running'"
-                class="process-actions"
-                @click.stop
-              >
+            <div class="process-record-side" role="gridcell">
+              <StateChip v-if="item.state !== 'running'" :value="item.state" />
+              <div v-else class="process-actions" @click.stop>
                 <v-btn
-                  icon="mdi-stop-circle-outline"
                   size="x-small"
                   variant="text"
                   class="table-action-btn"
@@ -154,12 +226,21 @@ async function stop(id: string, force: boolean) {
                     locale.t('$vuetify.chatroom.processes.terminate')
                   "
                   @click="stop(item.processId, false)"
-                />
+                >
+                  <v-progress-circular
+                    indeterminate
+                    color="warning"
+                    :size="22"
+                    :width="2"
+                  >
+                    <v-icon icon="$mdiStop" size="12" />
+                  </v-progress-circular>
+                </v-btn>
                 <v-menu>
                   <template #activator="{ props: menuProps }">
                     <v-btn
                       v-bind="menuProps"
-                      icon="mdi-dots-horizontal"
+                      icon="$mdiDotsHorizontal"
                       size="x-small"
                       variant="text"
                       class="table-action-btn"
@@ -171,7 +252,7 @@ async function stop(id: string, force: boolean) {
                   <v-list density="compact">
                     <v-list-item
                       :title="locale.t('$vuetify.chatroom.processes.kill')"
-                      prepend-icon="mdi-close-octagon-outline"
+                      prepend-icon="$mdiCloseOctagonOutline"
                       @click="stop(item.processId, true)"
                     />
                   </v-list>
@@ -187,11 +268,11 @@ async function stop(id: string, force: boolean) {
     </div>
 
     <div v-if="!compact || selected" class="detail-pane">
-      <v-card v-if="detail" class="panel-card">
+      <v-card v-if="detail" class="panel-card process-detail-card">
         <div class="panel-header process-detail-header">
           <v-btn
             v-if="compact"
-            icon="mdi-arrow-left"
+            icon="$mdiArrowLeft"
             size="small"
             variant="text"
             :aria-label="locale.t('$vuetify.chatroom.processes.back')"
@@ -204,12 +285,16 @@ async function stop(id: string, force: boolean) {
             </div>
           </div>
           <div class="process-detail-actions">
-            <StateChip :value="detail.state" />
+            <StateChip
+              v-if="detail.state !== 'running'"
+              :value="detail.state"
+            />
             <v-btn
               v-if="detail.state === 'running'"
-              prepend-icon="mdi-stop-circle-outline"
+              prepend-icon="$mdiStopCircleOutline"
               size="x-small"
               variant="tonal"
+              color="warning"
               class="detail-action-btn"
               @click="stop(detail.processId, false)"
             >
@@ -219,7 +304,7 @@ async function stop(id: string, force: boolean) {
               <template #activator="{ props: menuProps }">
                 <v-btn
                   v-bind="menuProps"
-                  icon="mdi-dots-horizontal"
+                  icon="$mdiDotsHorizontal"
                   size="x-small"
                   variant="text"
                   class="detail-icon-btn"
@@ -231,7 +316,7 @@ async function stop(id: string, force: boolean) {
               <v-list density="compact">
                 <v-list-item
                   :title="locale.t('$vuetify.chatroom.processes.kill')"
-                  prepend-icon="mdi-close-octagon-outline"
+                  prepend-icon="$mdiCloseOctagonOutline"
                   @click="stop(detail.processId, true)"
                 />
               </v-list>

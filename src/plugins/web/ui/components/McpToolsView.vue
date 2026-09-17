@@ -1,17 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 import { useLocale } from "vuetify";
-import { api } from "../api.js";
-
-defineProps<{ revision: number }>();
-
-interface McpToolSummary {
-  name: string;
-  pluginId: string;
-  title: string;
-  description: string;
-  enabled: boolean;
-}
+import { api, type McpToolSummary } from "../api.js";
+import { errorMessage } from "../utils/errors.js";
+import { createRequestGate } from "../utils/requests.js";
 
 interface ToolGroup {
   pluginId: string;
@@ -23,6 +15,7 @@ const tools = ref<McpToolSummary[]>([]);
 const loading = ref(false);
 const error = ref("");
 const busy = reactive(new Set<string>());
+const loadRequests = createRequestGate();
 
 const groups = computed<ToolGroup[]>(() => {
   const grouped = new Map<string, McpToolSummary[]>();
@@ -40,14 +33,18 @@ const groups = computed<ToolGroup[]>(() => {
 onMounted(() => void load());
 
 async function load() {
+  const request = loadRequests.begin();
   loading.value = true;
   error.value = "";
   try {
-    tools.value = await api<McpToolSummary[]>("/mcp/tools");
+    const next = await api<McpToolSummary[]>("/mcp/tools", {
+      signal: request.signal,
+    });
+    if (loadRequests.isCurrent(request)) tools.value = next;
   } catch (cause) {
-    error.value = (cause as Error).message;
+    if (loadRequests.isCurrent(request)) error.value = errorMessage(cause);
   } finally {
-    loading.value = false;
+    if (loadRequests.isCurrent(request)) loading.value = false;
   }
 }
 
@@ -66,7 +63,7 @@ async function setEnabled(tool: McpToolSummary, enabled: boolean) {
     const index = tools.value.findIndex((item) => item.name === updated.name);
     if (index >= 0) tools.value[index] = updated;
   } catch (cause) {
-    error.value = (cause as Error).message;
+    error.value = errorMessage(cause);
   } finally {
     busy.delete(tool.name);
   }
@@ -110,7 +107,7 @@ function allEnabled(group: ToolGroup): boolean {
         </div>
         <v-btn
           class="mcp-tools-refresh"
-          icon="mdi-refresh"
+          icon="$mdiRefresh"
           size="small"
           variant="text"
           :loading="loading"
@@ -226,8 +223,7 @@ function allEnabled(group: ToolGroup): boolean {
 }
 
 .mcp-tool-heading {
-  display: grid;
-  grid-template-columns: 170px minmax(0, 1fr);
+  display: flex;
   min-width: 0;
   align-items: baseline;
   gap: 12px;
@@ -242,11 +238,13 @@ function allEnabled(group: ToolGroup): boolean {
 }
 
 .mcp-tool-heading strong {
+  flex: 0 1 auto;
   font-size: 13px;
   font-weight: 650;
 }
 
 .mcp-tool-heading code {
+  flex: 1 1 0;
   color: rgb(var(--v-theme-on-surface), 0.52);
   font-size: 11px;
 }
@@ -290,7 +288,6 @@ function allEnabled(group: ToolGroup): boolean {
   }
 
   .mcp-tool-heading {
-    grid-template-columns: 142px minmax(0, 1fr);
     gap: 8px;
   }
 }
@@ -303,7 +300,6 @@ function allEnabled(group: ToolGroup): boolean {
   }
 
   .mcp-tool-heading {
-    grid-template-columns: 126px minmax(0, 1fr);
     gap: 6px;
   }
 }

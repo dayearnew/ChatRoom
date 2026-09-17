@@ -1,30 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useLocale } from "vuetify";
-import { api } from "../api.js";
+import {
+  api,
+  type CloudManagementSession,
+  type CloudRestoreResult,
+  type CloudService,
+  type CloudStatus,
+} from "../api.js";
+import { errorMessage } from "../utils/errors.js";
+import { createRequestGate } from "../utils/requests.js";
 import { appIntlLocale } from "../locales.js";
-
-interface CloudStatus {
-  installationId: string;
-  customerId: string | null;
-  publicPrefix: string | null;
-  desiredServices: { remote_mcp: boolean; remote_web: boolean };
-  entitlements: Array<{
-    service: "remote_mcp" | "remote_web";
-    status: "active";
-    sourceProvider: string;
-    sourceId: string;
-    validUntil: string | null;
-  }>;
-  managementSessionActive: boolean;
-  connection:
-    "inactive" | "connecting" | "connected" | "disconnected" | "error";
-  mcpUrl: string | null;
-  webUrl: string | null;
-  lastError: string | null;
-}
-
-type CloudService = "remote_mcp" | "remote_web";
 
 const locale = useLocale();
 const status = ref<CloudStatus | null>(null);
@@ -35,6 +21,7 @@ const restoring = ref(false);
 const refreshing = ref(false);
 const confirmationService = ref<CloudService | null>(null);
 const serviceUpdating = ref<CloudService | null>(null);
+const loadRequests = createRequestGate();
 
 const subscribed = computed(() => {
   const services = new Set(
@@ -82,15 +69,19 @@ function applyStatus(next: CloudStatus) {
 }
 
 function showError(value: unknown) {
-  error.value = value instanceof Error ? value.message : String(value);
+  error.value = errorMessage(value);
   errorVisible.value = true;
 }
 
 async function load() {
+  const request = loadRequests.begin();
   try {
-    applyStatus(await api<CloudStatus>("/cloud/status"));
+    const next = await api<CloudStatus>("/cloud/status", {
+      signal: request.signal,
+    });
+    if (loadRequests.isCurrent(request)) applyStatus(next);
   } catch (value) {
-    showError(value);
+    if (loadRequests.isCurrent(request)) showError(value);
   }
 }
 
@@ -107,7 +98,7 @@ async function refresh() {
 
 async function manage() {
   try {
-    const result = await api<{ url: string }>("/cloud/management", {
+    const result = await api<CloudManagementSession>("/cloud/management", {
       method: "POST",
     });
     window.open(result.url, "_blank", "noopener,noreferrer");
@@ -152,9 +143,10 @@ async function restore() {
   if (!recoveryKey.value.trim()) return;
   restoring.value = true;
   try {
-    const result = await api<{ status: CloudStatus }>("/cloud/restore", {
+    const result = await api<CloudRestoreResult>("/cloud/restore", {
       method: "POST",
       body: JSON.stringify({ recoveryKey: recoveryKey.value.trim() }),
+      timeoutMs: 120_000,
     });
     applyStatus(result.status);
     recoveryKey.value = "";
@@ -169,6 +161,15 @@ async function restore() {
 <template>
   <div class="cloud-view">
     <v-card class="panel-card cloud-panel">
+      <v-alert
+        v-if="status?.lastError"
+        type="error"
+        variant="tonal"
+        density="compact"
+        class="ma-3"
+      >
+        {{ status.lastError }}
+      </v-alert>
       <template v-if="status && subscribed">
         <div class="cloud-row">
           <div class="cloud-row-main">
@@ -182,14 +183,19 @@ async function restore() {
               {{ locale.t("$vuetify.chatroom.cloud.active") }}
             </v-chip>
             <v-btn
-              icon="mdi-refresh"
+              icon="$mdiRefresh"
               size="small"
               variant="text"
               :loading="refreshing"
               :aria-label="locale.t('$vuetify.chatroom.cloud.refresh')"
               @click="refresh"
             />
-            <v-btn variant="text" size="small" @click="manage">
+            <v-btn
+              variant="text"
+              size="small"
+              :disabled="!status.installationId"
+              @click="manage"
+            >
               {{ locale.t("$vuetify.chatroom.cloud.manage") }}
             </v-btn>
           </div>
@@ -249,7 +255,13 @@ async function restore() {
             </div>
             <div class="cloud-row-value">{{ subscriptionDescription }}</div>
           </div>
-          <v-btn color="primary" variant="flat" size="small" @click="manage">
+          <v-btn
+            color="primary"
+            variant="flat"
+            size="small"
+            :disabled="!status.installationId"
+            @click="manage"
+          >
             {{ locale.t("$vuetify.chatroom.cloud.purchase") }}
           </v-btn>
         </div>
@@ -267,7 +279,7 @@ async function restore() {
           />
           <v-btn
             :loading="restoring"
-            :disabled="!recoveryKey.trim()"
+            :disabled="!status.installationId || !recoveryKey.trim()"
             variant="tonal"
             size="small"
             @click="restore"
@@ -289,7 +301,7 @@ async function restore() {
               {{ locale.t("$vuetify.chatroom.cloud.installationId") }}
             </div>
             <div class="cloud-row-value mono installation-id">
-              {{ status.installationId }}
+              {{ status.installationId || "—" }}
             </div>
           </div>
         </div>

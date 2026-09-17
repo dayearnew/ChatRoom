@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import { useLocale } from "vuetify";
 import type { Operation } from "../api.js";
-import { appIntlLocale, sourceMessageKey } from "../locales.js";
+import { useOperationLabels } from "../composables/useOperationLabels.js";
+import { appIntlLocale } from "../locales.js";
 import { dateTime } from "../utils.js";
+import StateChip from "./StateChip.vue";
 
 defineProps<{ operations: Operation[]; busy: boolean }>();
 const emit = defineEmits<{ refresh: [] }>();
 const locale = useLocale();
 
-function sourceLabel(source: string): string {
-  const key = sourceMessageKey(source);
-  return key ? locale.t(key) : source;
-}
+const { sourceLabel } = useOperationLabels();
 
 function operationDescription(operation: Operation): string {
   if (operation.action === "snapshot")
@@ -127,8 +126,9 @@ function asRecord(value: unknown): Record<string, unknown> {
       <v-btn
         size="small"
         variant="text"
-        icon="mdi-refresh"
+        icon="$mdiRefresh"
         :loading="busy"
+        :aria-label="locale.t('$vuetify.chatroom.computer.refreshOperations')"
         @click="emit('refresh')"
       />
     </div>
@@ -155,13 +155,7 @@ function asRecord(value: unknown): Record<string, unknown> {
             {{ sourceLabel(operation.source) }}
           </v-list-item-subtitle>
           <template #append>
-            <v-chip
-              size="small"
-              :color="operation.status === 'error' ? 'error' : undefined"
-              variant="tonal"
-            >
-              {{ operation.status }}
-            </v-chip>
+            <StateChip :value="operation.status" />
           </template>
         </v-list-item>
       </v-list>
@@ -174,7 +168,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 <style scoped>
 .computer-operation-scroll {
-  height: 280px;
+  max-height: min(280px, 36dvh);
   overflow-y: auto;
   overscroll-behavior: contain;
 }

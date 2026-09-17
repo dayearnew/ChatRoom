@@ -1,13 +1,13 @@
 import { z } from "zod";
 
-export const computerPermissionStateSchema = z.enum([
+const computerPermissionStateSchema = z.enum([
   "granted",
   "denied",
   "unknown",
   "not-required",
 ]);
 
-export const computerDisplaySchema = z.object({
+const computerDisplaySchema = z.object({
   id: z.string(),
   name: z.string(),
   width: z.number(),
@@ -16,7 +16,7 @@ export const computerDisplaySchema = z.object({
   primary: z.boolean(),
 });
 
-export const computerElementSchema = z.object({
+const computerElementSchema = z.object({
   id: z.number().int(),
   role: z.string(),
   name: z.string().nullable(),
@@ -29,7 +29,7 @@ export const computerElementSchema = z.object({
   actions: z.array(z.string()),
 });
 
-export const computerScreenshotSchema = z.object({
+const computerScreenshotSchema = z.object({
   mimeType: z.enum(["image/jpeg", "image/png"]),
   data: z.string(),
 });

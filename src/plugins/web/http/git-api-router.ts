@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { ChatRoomError } from "../../../core/errors/chatroom-error.js";
 import {
   asyncRoute,
+  bodyRecord,
   requireString,
+  requireStringArray,
 } from "../../../presentation/http/http-utils.js";
 import type { GitStatus } from "../../git/types.js";
 import type { WebRuntime } from "../runtime.js";
@@ -167,25 +168,6 @@ async function resolveRoot(
   value: unknown,
 ): Promise<string> {
   return application.workspaces.resolve(requireString(value, "root"));
-}
-
-function bodyRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function requireStringArray(value: unknown, name: string): string[] {
-  if (
-    !Array.isArray(value) ||
-    value.length === 0 ||
-    value.some((item) => typeof item !== "string" || !item)
-  )
-    throw new ChatRoomError(
-      "INVALID_INPUT",
-      `${name} must be a non-empty array of strings`,
-    );
-  return value as string[];
 }
 
 function mutate(

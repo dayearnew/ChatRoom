@@ -42,7 +42,7 @@ const capturedAt = computed(() => {
       <v-btn
         size="small"
         variant="tonal"
-        prepend-icon="mdi-refresh"
+        prepend-icon="$mdiRefresh"
         :loading="busy"
         :disabled="!enabled"
         @click="emit('refresh')"
@@ -68,7 +68,7 @@ const capturedAt = computed(() => {
         />
       </div>
       <div v-else class="computer-screen-empty">
-        <v-icon icon="mdi-monitor-screenshot" size="42" />
+        <v-icon icon="$mdiMonitorScreenshot" size="42" />
         <span>{{ locale.t("$vuetify.chatroom.computer.noSnapshot") }}</span>
       </div>
       <div v-if="preview" class="computer-preview-meta">
@@ -139,7 +139,7 @@ const capturedAt = computed(() => {
 
 .computer-preview-meta {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
   gap: 10px;
   margin-top: 10px;
 }

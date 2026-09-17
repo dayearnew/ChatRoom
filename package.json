@@ -32,6 +32,7 @@
     "@modelcontextprotocol/node": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "@simplewebauthn/server": "13.3.2",
+    "compression": "^1.8.2",
     "express": "^5.1.0",
     "ws": "^8.18.3",
     "zod": "^4.0.17"
@@ -40,9 +41,10 @@
     "node-pty": "^1.1.0"
   },
   "devDependencies": {
-    "@mdi/font": "^7.4.47",
+    "@mdi/js": "^7.4.47",
     "@modelcontextprotocol/client": "^2.0.0",
     "@simplewebauthn/browser": "^13.3.0",
+    "@types/compression": "^1.8.1",
     "@types/express": "^5.0.3",
     "@types/node": "^24.2.1",
     "@types/ws": "^8.18.1",
