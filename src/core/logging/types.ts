@@ -1,16 +1,28 @@
-export type SystemLogLevel = "debug" | "info" | "warn" | "error";
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
-export interface SystemLogRecord {
+export interface LogRecord {
   id: string;
   timestamp: string;
-  level: SystemLogLevel;
+  level: LogLevel;
   module: string;
   event: string;
   message: string;
   data?: Record<string, unknown>;
 }
 
-export interface SystemLogSink {
+export interface LogQuery {
+  limit: number;
+  cursor?: string;
+  levels?: ReadonlySet<LogLevel>;
+  modules?: ReadonlySet<string>;
+}
+
+export interface LogPage {
+  items: LogRecord[];
+  nextCursor: string | null;
+}
+
+export interface LogWriter {
   debug(
     module: string,
     event: string,
@@ -35,6 +47,10 @@ export interface SystemLogSink {
     message: string,
     data?: Record<string, unknown>,
   ): void;
-  subscribe(listener: (record: SystemLogRecord) => void): () => void;
+}
+
+export interface LogService extends LogWriter {
+  list(query: LogQuery): Promise<LogPage>;
+  subscribe(listener: (record: LogRecord) => void): () => void;
   flush(): Promise<void>;
 }

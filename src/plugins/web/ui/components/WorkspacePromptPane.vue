@@ -19,6 +19,7 @@ const saved = ref(false);
 const error = ref("");
 const locale = useLocale();
 const loadRequests = createRequestGate();
+const saveRequests = createRequestGate();
 
 const dirty = computed(
   () =>
@@ -28,7 +29,11 @@ const dirty = computed(
 
 watch(
   () => props.root,
-  () => void load(),
+  () => {
+    saveRequests.invalidate();
+    saving.value = false;
+    void load();
+  },
   { immediate: true },
 );
 
@@ -55,15 +60,22 @@ async function load() {
   }
 }
 
-async function writeFile(root: string, path: string, content: string) {
+async function writeFile(
+  root: string,
+  path: string,
+  content: string,
+  signal: AbortSignal,
+) {
   await api("/workspace/file", {
     method: "PUT",
     body: JSON.stringify({ root, path, content }),
+    signal,
   });
 }
 
 async function save() {
-  if (!dirty.value) return;
+  if (!dirty.value || saving.value) return;
+  const request = saveRequests.begin();
   const root = props.root;
   const nextSummary = summary.value;
   const nextPrompt = prompt.value;
@@ -73,18 +85,20 @@ async function save() {
   try {
     const writes: Promise<void>[] = [];
     if (nextSummary !== originalSummary.value)
-      writes.push(writeFile(root, SUMMARY_PATH, nextSummary));
+      writes.push(writeFile(root, SUMMARY_PATH, nextSummary, request.signal));
     if (nextPrompt !== originalPrompt.value)
-      writes.push(writeFile(root, PROMPT_PATH, nextPrompt));
+      writes.push(writeFile(root, PROMPT_PATH, nextPrompt, request.signal));
     await Promise.all(writes);
-    if (props.root !== root) return;
+    if (!saveRequests.isCurrent(request) || props.root !== root) return;
     originalSummary.value = nextSummary;
     originalPrompt.value = nextPrompt;
     saved.value = true;
   } catch (cause) {
-    if (props.root === root) error.value = errorMessage(cause);
+    if (saveRequests.isCurrent(request) && props.root === root)
+      error.value = errorMessage(cause);
   } finally {
-    saving.value = false;
+    if (saveRequests.isCurrent(request) && props.root === root)
+      saving.value = false;
   }
 }
 </script>

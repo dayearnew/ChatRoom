@@ -1,51 +1,47 @@
-import type { ChatRoomConfig } from "../config/types.js";
-import { AppDatabase } from "../infrastructure/database/app-database.js";
-import { OperationRepository } from "../infrastructure/database/operation-repository.js";
-import { McpToolSettingsRepository } from "../infrastructure/database/mcp-tool-settings-repository.js";
-import { OAuthRepository } from "../infrastructure/database/oauth-repository.js";
-import { PasskeyRepository } from "../infrastructure/database/passkey-repository.js";
-import { WebSessionRepository } from "../infrastructure/database/web-session-repository.js";
+import type { ChatRoomConfig } from "#config/types";
+import { AppDatabase } from "#infrastructure/database/app-database";
+import { OperationRepository } from "#infrastructure/database/operation-repository";
+import { McpToolSettingsRepository } from "#infrastructure/database/mcp-tool-settings-repository";
+import { OAuthRepository } from "#infrastructure/database/oauth-repository";
+import { PasskeyRepository } from "#infrastructure/database/passkey-repository";
+import { WebSessionRepository } from "#infrastructure/database/web-session-repository";
 import { RuntimeEventBus } from "./event-bus.js";
-import { OperationLog } from "../operations/operation-log.js";
-import { AuthService } from "../auth/auth-service.js";
-import { PasskeyService } from "../auth/passkey-service.js";
+import { OperationLog } from "#operations/operation-log";
+import { AuthService } from "#auth/auth-service";
+import { PasskeyService } from "#auth/passkey-service";
 import { ExternalAccessRegistry } from "./external-access-registry.js";
-import { ServiceRegistry } from "../plugins/types.js";
-import { PluginManager } from "../plugins/plugin-manager.js";
-import { createWorkspacePlugin } from "../plugins/workspace/plugin.js";
-import { createGitPlugin } from "../plugins/git/plugin.js";
-import {
-  createProcessPlugin,
-  ProcessService,
-} from "../plugins/process/plugin.js";
-import { createCloudPlugin, CloudService } from "../plugins/cloud/plugin.js";
+import { ServiceRegistry } from "#plugins/types";
+import { PluginManager } from "#plugins/plugin-manager";
+import { createWorkspacePlugin } from "#plugins/workspace/plugin";
+import { createGitPlugin } from "#plugins/git/plugin";
+import { createProcessPlugin, ProcessService } from "#plugins/process/plugin";
+import { createCloudPlugin, CloudService } from "#plugins/cloud/plugin";
 import {
   createComputerPlugin,
   ComputerServiceToken,
-} from "../plugins/computer/plugin.js";
-import { createWebPlugin, WebServiceToken } from "../plugins/web/plugin.js";
-import { createChatRoomMcpHandler } from "../mcp/server/create-mcp-server.js";
-import { McpToolControl } from "../mcp/server/tool-control.js";
-import { HttpServer } from "../infrastructure/http/http-server.js";
-import { SystemLogger } from "../infrastructure/logging/logger.js";
-import { SystemLogReader } from "../infrastructure/logging/log-reader.js";
+} from "#plugins/computer/plugin";
+import { createWebPlugin, WebServiceToken } from "#plugins/web/plugin";
+import { createChatRoomMcpHandler } from "#mcp/server/create-mcp-server";
+import { McpToolControl } from "#mcp/server/tool-control";
+import { HttpServer } from "#infrastructure/http/http-server";
+import type { LogService } from "#core/logging/types";
 
 export interface ApplicationComponents {
   database: AppDatabase;
   eventBus: RuntimeEventBus;
   operations: OperationLog;
   plugins: PluginManager;
-  application: import("../plugins/web/runtime.js").WebRuntime;
-  processes: import("../plugins/process/process-supervisor.js").ProcessSupervisor;
-  cloud: import("../plugins/cloud/controller.js").CloudController;
-  computer: import("../plugins/computer/computer-service.js").ComputerService;
+  application: import("#plugins/web/runtime").WebRuntime;
+  processes: import("#plugins/process/process-supervisor").ProcessSupervisor;
+  cloud: import("#plugins/cloud/controller").CloudController;
+  computer: import("#plugins/computer/computer-service").ComputerService;
   http: HttpServer;
-  logger: SystemLogger;
+  logs: LogService;
 }
 
 export async function createApplication(
   config: ChatRoomConfig,
-  logger = new SystemLogger(config.dataDir),
+  logs: LogService,
 ): Promise<ApplicationComponents> {
   const database = new AppDatabase(config.databasePath);
   try {
@@ -76,7 +72,7 @@ export async function createApplication(
         events: eventBus,
         externalAccess,
         services,
-        logger,
+        logs,
       },
       [
         createWorkspacePlugin(),
@@ -93,7 +89,6 @@ export async function createApplication(
     const cloud = services.require(CloudService);
     const computer = services.require(ComputerServiceToken);
     const mcp = createChatRoomMcpHandler(plugins);
-    const logReader = new SystemLogReader(logger.filePath);
     const http = new HttpServer(
       config,
       web.application,
@@ -103,8 +98,7 @@ export async function createApplication(
       mcp,
       externalAccess,
       cloud,
-      logger,
-      logReader,
+      logs,
     );
     return {
       database,
@@ -116,7 +110,7 @@ export async function createApplication(
       cloud,
       computer,
       http,
-      logger,
+      logs,
     };
   } catch (error) {
     database.close();

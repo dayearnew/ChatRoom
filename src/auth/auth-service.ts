@@ -5,10 +5,10 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import type { AuthInfo } from "@modelcontextprotocol/server";
-import { ChatRoomError } from "../core/errors/chatroom-error.js";
-import type { OAuthStateRepository } from "../core/auth/repository.js";
-import type { WebSessionRepository } from "../core/auth/session-repository.js";
-import type { ChatRoomConfig } from "../config/types.js";
+import { ChatRoomError } from "#core/errors/chatroom-error";
+import type { OAuthStateRepository } from "#core/auth/repository";
+import type { WebSessionRepository } from "#core/auth/session-repository";
+import type { ChatRoomConfig } from "#config/types";
 
 export interface AuthorizationRequest {
   clientId: string;
@@ -288,10 +288,17 @@ export class AuthService {
       url.hostname === "localhost" ||
       url.hostname === "127.0.0.1" ||
       url.hostname === "::1";
-    if (url.protocol !== "https:" && !loopback)
+    const allowedProtocol =
+      url.protocol === "https:" || (url.protocol === "http:" && loopback);
+    if (!allowedProtocol)
       throw new ChatRoomError(
         "FORBIDDEN",
-        "OAuth redirects must use HTTPS unless loopback",
+        "OAuth redirects must use HTTPS unless using loopback HTTP",
+      );
+    if (url.hash)
+      throw new ChatRoomError(
+        "INVALID_INPUT",
+        "OAuth redirect_uri must not include a fragment",
       );
     if (!this.config.allowedRedirectHosts.includes(url.hostname))
       throw new ChatRoomError(

@@ -1,8 +1,8 @@
-import type { Operation } from "../../core/operations/types.js";
+import type { Operation } from "#core/operations/types";
 import type {
   OperationQuery,
   OperationRepository as OperationRepositoryPort,
-} from "../../core/operations/repository.js";
+} from "#core/operations/repository";
 import type { AppDatabase } from "./app-database.js";
 
 export class OperationRepository implements OperationRepositoryPort {

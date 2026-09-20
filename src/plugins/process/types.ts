@@ -28,3 +28,8 @@ export interface ProcessSnapshot {
   timedOut: boolean;
   operationId: string;
 }
+
+export type ProcessSummary = Pick<
+  ProcessSnapshot,
+  "processId" | "command" | "args" | "state" | "startedAt" | "durationMs"
+>;

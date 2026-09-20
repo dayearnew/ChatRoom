@@ -1,24 +1,29 @@
-import type { Operation as DomainOperation } from "../../core/operations/types.js";
+import type { Operation as DomainOperation } from "#core/operations/types";
 import type {
   GitBranch,
   GitChange,
   GitCommit,
   GitDiff,
   GitStatus,
-} from "../git/types.js";
-import type { ProcessSnapshot } from "../process/types.js";
+} from "#plugins/git/types";
+import type { ProcessSnapshot, ProcessSummary } from "#plugins/process/types";
+import type { McpToolSummary as DomainMcpToolSummary } from "#mcp/server/tool-control";
+import type {
+  CloudServiceId,
+  CloudStatus as DomainCloudStatus,
+} from "#plugins/cloud/types";
 import type {
   ComputerDisplay,
   ComputerPermission,
   ComputerSnapshot,
   ComputerStatus,
-} from "../computer/types.js";
+} from "#plugins/computer/types";
 import type {
   WorkspaceEntry,
   WorkspaceFile,
   WorkspaceInfo,
   WorkspaceSkill,
-} from "../workspace/types.js";
+} from "#plugins/workspace/types";
 
 export type {
   ComputerDisplay,
@@ -30,6 +35,7 @@ export type {
   GitDiff,
   GitStatus,
   ProcessSnapshot,
+  ProcessSummary,
   WorkspaceEntry,
   WorkspaceFile,
   WorkspaceInfo,
@@ -74,35 +80,10 @@ export interface UpdateStatus {
   releaseUrl: string | null;
 }
 
-export interface McpToolSummary {
-  name: string;
-  pluginId: string;
-  title: string;
-  description: string;
-  enabled: boolean;
-}
+export type McpToolSummary = DomainMcpToolSummary;
+export type CloudService = CloudServiceId;
+export type CloudStatus = DomainCloudStatus;
 
-export type CloudService = "remote_mcp" | "remote_web";
-
-export interface CloudStatus {
-  installationId: string | null;
-  customerId: string | null;
-  publicPrefix: string | null;
-  desiredServices: Record<CloudService, boolean>;
-  entitlements: Array<{
-    service: CloudService;
-    status: "active";
-    sourceProvider: string;
-    sourceId: string;
-    validUntil: string | null;
-  }>;
-  managementSessionActive: boolean;
-  connection:
-    "inactive" | "connecting" | "connected" | "disconnected" | "error";
-  mcpUrl: string | null;
-  webUrl: string | null;
-  lastError: string | null;
-}
 export interface WorkspaceFileContent {
   content: string;
 }
@@ -115,19 +96,4 @@ export interface CloudRestoreResult {
   status: CloudStatus;
 }
 
-export type SystemLogLevel = "debug" | "info" | "warn" | "error";
-
-export interface SystemLogRecord {
-  id: string;
-  timestamp: string;
-  level: SystemLogLevel;
-  module: string;
-  event: string;
-  message: string;
-  data?: Record<string, unknown>;
-}
-
-export interface SystemLogPage {
-  items: SystemLogRecord[];
-  nextBefore: string | null;
-}
+export type { LogLevel, LogPage, LogRecord } from "#core/logging/types";

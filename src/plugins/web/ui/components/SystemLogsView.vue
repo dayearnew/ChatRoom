@@ -1,12 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useDisplay, useLocale } from "vuetify";
-import {
-  api,
-  type SystemLogLevel,
-  type SystemLogPage,
-  type SystemLogRecord,
-} from "../api.js";
+import { api, type LogLevel, type LogPage, type LogRecord } from "../api.js";
 import { appIntlLocale } from "../locales.js";
 import { clock, dateTime } from "../utils.js";
 import { errorMessage } from "../utils/errors.js";
@@ -21,21 +16,20 @@ const KNOWN_MODULES = [
   "cloud",
   "plugin",
   "mcp",
-  "computer",
-  "database",
 ] as const;
 
 const locale = useLocale();
 const { mdAndDown: compact } = useDisplay();
-const records = ref<SystemLogRecord[]>([]);
-const selected = ref<SystemLogRecord | null>(null);
-const level = ref<SystemLogLevel | "all">("all");
+const records = ref<LogRecord[]>([]);
+const selected = ref<LogRecord | null>(null);
+const level = ref<LogLevel | "all">("all");
 const module = ref("all");
-const nextBefore = ref<string | null>(null);
+const nextCursor = ref<string | null>(null);
 const loading = ref(false);
 const loadingMore = ref(false);
 const error = ref("");
-const requests = createRequestGate();
+const listRequests = createRequestGate();
+const moreRequests = createRequestGate();
 let stream: EventSource | null = null;
 let ready = false;
 
@@ -70,7 +64,9 @@ watch([level, module], () => {
 
 onMounted(() => {
   ready = true;
-  void loadInitial().finally(connectStream);
+  void loadInitial().finally(() => {
+    if (ready) connectStream();
+  });
 });
 
 onBeforeUnmount(() => {
@@ -80,48 +76,52 @@ onBeforeUnmount(() => {
 });
 
 async function loadInitial() {
-  const request = requests.begin();
+  moreRequests.invalidate();
+  loadingMore.value = false;
+  const request = listRequests.begin();
   loading.value = true;
   error.value = "";
   try {
-    const page = await api<SystemLogPage>(logsUrl());
-    if (!requests.isCurrent(request)) return;
+    const page = await api<LogPage>(logsUrl(), { signal: request.signal });
+    if (!listRequests.isCurrent(request)) return;
     records.value = page.items;
-    nextBefore.value = page.nextBefore;
+    nextCursor.value = page.nextCursor;
     if (selected.value) {
       selected.value =
         page.items.find((item) => item.id === selected.value?.id) ?? null;
     }
   } catch (cause) {
-    if (requests.isCurrent(request)) error.value = errorMessage(cause);
+    if (listRequests.isCurrent(request)) error.value = errorMessage(cause);
   } finally {
-    if (requests.isCurrent(request)) loading.value = false;
+    if (listRequests.isCurrent(request)) loading.value = false;
   }
 }
 
 async function loadMore() {
-  if (!nextBefore.value || loadingMore.value) return;
-  const request = requests.begin();
+  if (loading.value || !nextCursor.value || loadingMore.value) return;
+  const request = moreRequests.begin();
   loadingMore.value = true;
   error.value = "";
   try {
-    const page = await api<SystemLogPage>(logsUrl(nextBefore.value));
-    if (!requests.isCurrent(request)) return;
+    const page = await api<LogPage>(logsUrl(nextCursor.value), {
+      signal: request.signal,
+    });
+    if (!moreRequests.isCurrent(request)) return;
     const known = new Set(records.value.map((item) => item.id));
     records.value.push(...page.items.filter((item) => !known.has(item.id)));
-    nextBefore.value = page.nextBefore;
+    nextCursor.value = page.nextCursor;
   } catch (cause) {
-    if (requests.isCurrent(request)) error.value = errorMessage(cause);
+    if (moreRequests.isCurrent(request)) error.value = errorMessage(cause);
   } finally {
-    if (requests.isCurrent(request)) loadingMore.value = false;
+    if (moreRequests.isCurrent(request)) loadingMore.value = false;
   }
 }
 
-function logsUrl(before?: string): string {
+function logsUrl(cursor?: string): string {
   const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
   if (level.value !== "all") params.set("level", level.value);
   if (module.value !== "all") params.set("module", module.value);
-  if (before) params.set("before", before);
+  if (cursor) params.set("cursor", cursor);
   return `/logs?${params}`;
 }
 
@@ -136,11 +136,11 @@ function connectStream() {
   });
 }
 
-function parseLogEvent(event: Event): SystemLogRecord | null {
+function parseLogEvent(event: Event): LogRecord | null {
   if (!(event instanceof MessageEvent) || typeof event.data !== "string")
     return null;
   try {
-    const value = JSON.parse(event.data) as SystemLogRecord;
+    const value = JSON.parse(event.data) as LogRecord;
     return typeof value?.id === "string" && typeof value?.message === "string"
       ? value
       : null;
@@ -149,14 +149,14 @@ function parseLogEvent(event: Event): SystemLogRecord | null {
   }
 }
 
-function matchesFilters(record: SystemLogRecord): boolean {
+function matchesFilters(record: LogRecord): boolean {
   return (
     (level.value === "all" || record.level === level.value) &&
     (module.value === "all" || record.module === module.value)
   );
 }
 
-function levelColor(value: SystemLogLevel): string | undefined {
+function levelColor(value: LogLevel): string | undefined {
   if (value === "error") return "error";
   if (value === "warn") return "warning";
   if (value === "info") return "primary";
@@ -275,7 +275,7 @@ function backToLogs() {
         <div v-else-if="!loading" class="empty-inline">
           {{ locale.t("$vuetify.chatroom.systemLogs.empty") }}
         </div>
-        <div v-if="nextBefore" class="system-log-load-more">
+        <div v-if="nextCursor" class="system-log-load-more">
           <v-btn
             variant="text"
             size="small"

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   CLOUD_ENTITLEMENT_SCHEMA,
+  CLOUD_HTTP_URL_SCHEMA,
   CLOUD_LEASE_SCHEMA,
   type CloudEntitlement,
   type CloudLeaseState,
@@ -17,7 +18,7 @@ const recoveryCredentialSchema = z
 const sessionSchema = z
   .object({
     purchaseToken: z.string().min(24),
-    managementUrl: z.string().url(),
+    managementUrl: CLOUD_HTTP_URL_SCHEMA,
     expiresAt: z.string().datetime(),
   })
   .strict();

@@ -12,6 +12,7 @@ import { z } from "zod";
 import {
   CLOUD_DESIRED_SERVICES_SCHEMA,
   CLOUD_ENTITLEMENT_SCHEMA,
+  CLOUD_HTTP_URL_SCHEMA,
   CLOUD_LEASE_SCHEMA,
   type CloudPersistedState,
 } from "./types.js";
@@ -29,7 +30,7 @@ const stateSchema = z
     managementSession: z
       .object({
         purchaseToken: z.string().min(24),
-        managementUrl: z.string().url(),
+        managementUrl: CLOUD_HTTP_URL_SCHEMA,
         expiresAt: z.string().datetime(),
       })
       .strict()

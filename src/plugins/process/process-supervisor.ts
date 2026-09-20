@@ -1,15 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { ChatRoomError } from "../../core/errors/chatroom-error.js";
-import { childEnvironment } from "../../core/runtime/child-environment.js";
+import { ChatRoomError } from "#core/errors/chatroom-error";
+import { childEnvironment } from "#core/runtime/child-environment";
 import { HeadTailBuffer } from "./head-tail-buffer.js";
 import type {
   ProcessId,
   ProcessSnapshot,
   ProcessStartRequest,
+  ProcessSummary,
 } from "./types.js";
-import type { RuntimeEventBus } from "../../app/event-bus.js";
-import type { OperationLog } from "../../operations/operation-log.js";
-import type { OperationSource } from "../../core/operations/types.js";
+import type { RuntimeEventBus } from "#app/event-bus";
+import type { OperationLog } from "#operations/operation-log";
+import type { OperationSource } from "#core/operations/types";
 import type { BackendProcess, ProcessBackend } from "./backend.js";
 
 interface ManagedProcess {
@@ -102,7 +103,11 @@ export class ProcessSupervisor {
       resolveSettled = resolve;
     });
     const managed: ManagedProcess = {
-      request,
+      request: {
+        ...request,
+        args: [...args],
+        ...(request.env ? { env: { ...request.env } } : {}),
+      },
       backend,
       stdout: new HeadTailBuffer(this.maxOutputBytes),
       stderr: new HeadTailBuffer(this.maxOutputBytes),
@@ -147,6 +152,11 @@ export class ProcessSupervisor {
   list(): ProcessSnapshot[] {
     return [...this.processes.entries()]
       .map(([id, item]) => this.snapshotOf(id, item))
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  }
+  summaries(): ProcessSummary[] {
+    return [...this.processes.entries()]
+      .map(([id, item]) => this.summaryOf(id, item))
       .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   }
   write(processId: ProcessId, data: string): ProcessSnapshot {
@@ -257,6 +267,18 @@ export class ProcessSupervisor {
       );
     return item;
   }
+  private summaryOf(id: string, item: ManagedProcess): ProcessSummary {
+    const finish = item.finishedAt?.getTime() ?? Date.now();
+    return {
+      processId: id,
+      command: item.request.command,
+      args: [...(item.request.args ?? [])],
+      state: item.state,
+      startedAt: item.startedAt.toISOString(),
+      durationMs: Math.max(0, finish - item.startedAt.getTime()),
+    };
+  }
+
   private snapshotOf(id: string, item: ManagedProcess): ProcessSnapshot {
     const stdout = item.stdout.snapshot(),
       stderr = item.stderr.snapshot(),
@@ -264,7 +286,7 @@ export class ProcessSupervisor {
     return {
       processId: id,
       command: item.request.command,
-      args: item.request.args ?? [],
+      args: [...(item.request.args ?? [])],
       cwd: item.request.cwd,
       pid: item.backend.pid,
       state: item.state,

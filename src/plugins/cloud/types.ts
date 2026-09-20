@@ -1,6 +1,22 @@
 import { z } from "zod";
 
 export const CLOUD_SERVICES = ["remote_mcp", "remote_web"] as const;
+
+export const CLOUD_HTTP_URL_SCHEMA = z
+  .string()
+  .url()
+  .refine((value) => {
+    const protocol = new URL(value).protocol;
+    return protocol === "http:" || protocol === "https:";
+  }, "URL must use HTTP or HTTPS");
+
+export const CLOUD_WEBSOCKET_URL_SCHEMA = z
+  .string()
+  .url()
+  .refine((value) => {
+    const protocol = new URL(value).protocol;
+    return protocol === "ws:" || protocol === "wss:";
+  }, "URL must use WS or WSS");
 export const CLOUD_SERVICE_SCHEMA = z.enum(CLOUD_SERVICES);
 export type CloudServiceId = (typeof CLOUD_SERVICES)[number];
 const PUBLIC_SERVICE_TO_CLOUD_SERVICE = {
@@ -33,12 +49,26 @@ export const CLOUD_LEASE_SCHEMA = z
   .object({
     token: z.string().min(1),
     expiresAt: z.string().datetime(),
-    tunnelUrl: z.string().url(),
-    mcpBaseUrl: z.string().url().nullable(),
-    webBaseUrl: z.string().url().nullable(),
+    tunnelUrl: CLOUD_WEBSOCKET_URL_SCHEMA,
+    mcpBaseUrl: CLOUD_HTTP_URL_SCHEMA.nullable(),
+    webBaseUrl: CLOUD_HTTP_URL_SCHEMA.nullable(),
     services: z.array(CLOUD_SERVICE_SCHEMA),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.services.includes("remote_mcp") && !value.mcpBaseUrl)
+      context.addIssue({
+        code: "custom",
+        path: ["mcpBaseUrl"],
+        message: "remote_mcp lease requires mcpBaseUrl",
+      });
+    if (value.services.includes("remote_web") && !value.webBaseUrl)
+      context.addIssue({
+        code: "custom",
+        path: ["webBaseUrl"],
+        message: "remote_web lease requires webBaseUrl",
+      });
+  });
 export type CloudLeaseState = z.infer<typeof CLOUD_LEASE_SCHEMA>;
 
 interface ManagementSessionState {

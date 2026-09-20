@@ -1,5 +1,5 @@
-import type { InternalPlugin } from "../types.js";
-import { createServiceToken } from "../types.js";
+import type { InternalPlugin } from "#plugins/types";
+import { createServiceToken } from "#plugins/types";
 import { PipeProcessBackend } from "./infrastructure/pipe-process-backend.js";
 import { PtyProcessBackend } from "./infrastructure/pty-process-backend.js";
 import { registerProcessTools } from "./mcp.js";

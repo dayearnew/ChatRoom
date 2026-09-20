@@ -1,8 +1,8 @@
 import { Router } from "express";
-import type { RuntimeEventBus } from "../../../app/event-bus.js";
-import { ChatRoomError } from "../../../core/errors/chatroom-error.js";
-import { requireString } from "../../../presentation/http/http-utils.js";
-import type { WebRuntime } from "../runtime.js";
+import type { RuntimeEventBus } from "#app/event-bus";
+import { ChatRoomError } from "#core/errors/chatroom-error";
+import { bodyRecord, requireString } from "#presentation/http/http-utils";
+import type { WebRuntime } from "#plugins/web/runtime";
 
 interface RuntimeStatus {
   version: string;
@@ -22,7 +22,7 @@ export function createRuntimeApiRouter(
     res.json(application.mcpTools.list());
   });
   router.patch("/mcp/tools/:toolName", (req, res) => {
-    const body = req.body as Record<string, unknown>;
+    const body = bodyRecord(req.body);
     if (typeof body.enabled !== "boolean")
       throw new ChatRoomError("INVALID_INPUT", "enabled must be a boolean");
     res.json(

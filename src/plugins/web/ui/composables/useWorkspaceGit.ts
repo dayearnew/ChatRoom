@@ -45,6 +45,7 @@ export function useWorkspaceGit(root: WatchSource<string>) {
       generation += 1;
       loadRequests.invalidate();
       diffRequests.invalidate();
+      busy.value = null;
       selectedPath.value = null;
       diff.value = null;
       void load();

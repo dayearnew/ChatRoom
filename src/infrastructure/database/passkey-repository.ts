@@ -1,7 +1,7 @@
 import type {
   PasskeyRecord,
   PasskeyRepository as PasskeyRepositoryPort,
-} from "../../core/auth/passkey-repository.js";
+} from "#core/auth/passkey-repository";
 import type { AppDatabase } from "./app-database.js";
 
 export class PasskeyRepository implements PasskeyRepositoryPort {

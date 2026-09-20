@@ -1,4 +1,4 @@
-import type { AppDatabase } from "../../infrastructure/database/app-database.js";
+import type { AppDatabase } from "#infrastructure/database/app-database";
 import type { ComputerSettings } from "./types.js";
 
 export class ComputerSettingsRepository {

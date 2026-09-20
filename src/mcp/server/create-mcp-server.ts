@@ -3,11 +3,8 @@ import {
   McpServer,
   type McpHttpHandler,
 } from "@modelcontextprotocol/server";
-import type { PluginManager } from "../../plugins/plugin-manager.js";
-import {
-  CHATROOM_NAME,
-  CHATROOM_VERSION,
-} from "../../core/runtime/identity.js";
+import type { PluginManager } from "#plugins/plugin-manager";
+import { CHATROOM_NAME, CHATROOM_VERSION } from "#core/runtime/identity";
 
 export function createChatRoomMcpHandler(
   plugins: PluginManager,

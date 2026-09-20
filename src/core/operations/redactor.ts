@@ -30,20 +30,24 @@ export class SecretRedactor {
     if (value === null || typeof value !== "object") return value;
     if (seen.has(value)) return "[circular]";
     seen.add(value);
+    try {
+      if (Array.isArray(value))
+        return value.map((item) => this.walk(item, seen));
 
-    if (Array.isArray(value)) return value.map((item) => this.walk(item, seen));
-
-    const result: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(
-      value as Record<string, unknown>,
-    )) {
-      result[key] = SECRET_KEY.test(key)
-        ? "[redacted]"
-        : key === "args" && Array.isArray(item)
-          ? redactArguments(item, (entry) => this.walk(entry, seen))
-          : this.walk(item, seen);
+      const result: Record<string, unknown> = {};
+      for (const [key, item] of Object.entries(
+        value as Record<string, unknown>,
+      )) {
+        result[key] = SECRET_KEY.test(key)
+          ? "[redacted]"
+          : key === "args" && Array.isArray(item)
+            ? redactArguments(item, (entry) => this.walk(entry, seen))
+            : this.walk(item, seen);
+      }
+      return result;
+    } finally {
+      seen.delete(value);
     }
-    return result;
   }
 }
 

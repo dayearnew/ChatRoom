@@ -1,6 +1,6 @@
-import type { ChatRoomConfig } from "../../config/types.js";
-import { ChatRoomError } from "../../core/errors/chatroom-error.js";
-import type { SystemLogSink } from "../../core/logging/types.js";
+import type { ChatRoomConfig } from "#config/types";
+import { ChatRoomError } from "#core/errors/chatroom-error";
+import type { LogWriter } from "#core/logging/types";
 import { CloudApiClient } from "./api-client.js";
 import { CloudStateStore } from "./state-store.js";
 import { CloudTunnelClient } from "./tunnel-client.js";
@@ -35,8 +35,8 @@ export class CloudController {
   private constructor(
     private readonly config: ChatRoomConfig,
     cloudApi: string,
-    private readonly externalAccess?: ExternalAccessSink,
-    private readonly logger?: SystemLogSink,
+    private readonly logs: LogWriter,
+    private readonly externalAccess: ExternalAccessSink,
   ) {
     this.store = new CloudStateStore(config.dataDir);
     this.api = new CloudApiClient(cloudApi);
@@ -44,8 +44,8 @@ export class CloudController {
 
   static async create(
     config: ChatRoomConfig,
-    externalAccess?: ExternalAccessSink,
-    logger?: SystemLogSink,
+    logs: LogWriter,
+    externalAccess: ExternalAccessSink,
   ): Promise<CloudController> {
     const apiBaseUrl = (
       process.env.CHATROOM_CLOUD_API ?? "https://chatroomcp.com"
@@ -53,8 +53,8 @@ export class CloudController {
     const controller = new CloudController(
       config,
       apiBaseUrl,
+      logs,
       externalAccess,
-      logger,
     );
     await controller.ensureState().catch(() => undefined);
     return controller;
@@ -116,7 +116,7 @@ export class CloudController {
     return this.serial(async () => {
       this.tunnel?.stop();
       this.tunnel = null;
-      this.externalAccess?.clearCloud();
+      this.externalAccess.clearCloud();
       if (this.state?.lease) this.connection = "disconnected";
     });
   }
@@ -298,14 +298,9 @@ export class CloudController {
     )
       return;
     this.connection = "connecting";
-    this.logger?.info(
-      "cloud",
-      "cloud.connecting",
-      "Cloud tunnel is connecting",
-      {
-        services: state.lease.services,
-      },
-    );
+    this.logs.info("cloud", "cloud.connecting", "Cloud tunnel is connecting", {
+      services: state.lease.services,
+    });
     this.tunnel = new CloudTunnelClient(
       state.lease,
       { devicePrivateKey: state.devicePrivateKey },
@@ -314,19 +309,14 @@ export class CloudController {
         onConnected: () => {
           this.lastError = null;
           this.connection = "connected";
-          this.logger?.info(
-            "cloud",
-            "cloud.connected",
-            "Cloud tunnel connected",
-            {
-              services: this.state?.lease?.services ?? [],
-            },
-          );
+          this.logs.info("cloud", "cloud.connected", "Cloud tunnel connected", {
+            services: this.state?.lease?.services ?? [],
+          });
         },
         onDisconnected: () => {
           if (!this.stopped && this.state?.lease) {
             this.connection = "disconnected";
-            this.logger?.warn(
+            this.logs.warn(
               "cloud",
               "cloud.disconnected",
               "Cloud tunnel disconnected",
@@ -342,13 +332,13 @@ export class CloudController {
   private publishExternalAccess(): void {
     const state = this.state;
     if (!state) {
-      this.externalAccess?.clearCloud();
+      this.externalAccess.clearCloud();
       return;
     }
     const lease = state.lease;
     const activeLease =
       lease && Date.parse(lease.expiresAt) > Date.now() ? lease : null;
-    this.externalAccess?.setCloud({
+    this.externalAccess.setCloud({
       mcpBaseUrl: activeLease?.services.includes("remote_mcp")
         ? activeLease.mcpBaseUrl
         : null,
@@ -447,11 +437,11 @@ export class CloudController {
       this.publishExternalAccess();
       return this.state;
     } catch (error) {
-      this.externalAccess?.clearCloud();
+      this.externalAccess.clearCloud();
       const detail = error instanceof Error ? error.message : String(error);
       this.lastError = `Cloud state unavailable: ${detail}`;
       this.connection = "error";
-      this.logger?.error(
+      this.logs.error(
         "cloud",
         "cloud.state_unavailable",
         "Cloud state is unavailable",
@@ -477,7 +467,7 @@ export class CloudController {
   private setError(error: unknown): void {
     this.lastError = error instanceof Error ? error.message : String(error);
     this.connection = "error";
-    this.logger?.error("cloud", "cloud.error", "Cloud operation failed", {
+    this.logs.error("cloud", "cloud.error", "Cloud operation failed", {
       error,
     });
   }

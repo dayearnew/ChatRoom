@@ -1,9 +1,9 @@
-import type { InternalPlugin } from "../types.js";
-import { createServiceToken } from "../types.js";
-import { ComputerServiceToken } from "../computer/plugin.js";
-import { GitServiceToken } from "../git/plugin.js";
-import { ProcessService } from "../process/plugin.js";
-import { WorkspaceServiceToken } from "../workspace/plugin.js";
+import type { InternalPlugin } from "#plugins/types";
+import { createServiceToken } from "#plugins/types";
+import { ComputerServiceToken } from "#plugins/computer/plugin";
+import { GitServiceToken } from "#plugins/git/plugin";
+import { ProcessService } from "#plugins/process/plugin";
+import { WorkspaceServiceToken } from "#plugins/workspace/plugin";
 import { WebRuntime } from "./runtime.js";
 
 interface WebPluginService {

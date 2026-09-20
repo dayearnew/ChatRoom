@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { ChatRoomError } from "../errors/chatroom-error.js";
+import { ChatRoomError } from "#core/errors/chatroom-error";
 import { childEnvironment } from "./child-environment.js";
 
 export interface CommandRequest {
@@ -30,6 +30,14 @@ export class CommandRunner {
         ? setTimeout(() => child.kill("SIGKILL"), request.timeoutMs)
         : null;
       timeout?.unref();
+      let settled = false;
+      const settle = (action: () => void) => {
+        if (settled) return;
+        settled = true;
+        if (timeout) clearTimeout(timeout);
+        action();
+      };
+
       child.stdout.setEncoding("utf8");
       child.stderr.setEncoding("utf8");
       child.stdout.on("data", (chunk: string) => {
@@ -38,21 +46,22 @@ export class CommandRunner {
       child.stderr.on("data", (chunk: string) => {
         stderr += chunk;
       });
-      child.once("error", reject);
+      child.once("error", (error) => settle(() => reject(error)));
       child.once("close", (code) => {
-        if (timeout) clearTimeout(timeout);
-        const exitCode = code ?? -1;
-        if (exitCode !== 0) {
-          reject(
-            new ChatRoomError(
-              "PROCESS_FAILED",
-              `${request.command} exited with code ${exitCode}`,
-              { stdout, stderr, exitCode },
-            ),
-          );
-          return;
-        }
-        resolve({ stdout, stderr, exitCode });
+        settle(() => {
+          const exitCode = code ?? -1;
+          if (exitCode !== 0) {
+            reject(
+              new ChatRoomError(
+                "PROCESS_FAILED",
+                request.command + " exited with code " + exitCode,
+                { stdout, stderr, exitCode },
+              ),
+            );
+            return;
+          }
+          resolve({ stdout, stderr, exitCode });
+        });
       });
     });
   }

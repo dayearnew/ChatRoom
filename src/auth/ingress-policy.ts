@@ -1,9 +1,9 @@
 import type { Request } from "express";
-import type { ChatRoomConfig } from "../config/types.js";
+import type { ChatRoomConfig } from "#config/types";
 import type {
   ExternalAccessRegistry,
   ExternalAccessKind,
-} from "../app/external-access-registry.js";
+} from "#app/external-access-registry";
 
 export interface WebAuthnOrigin {
   origin: string;

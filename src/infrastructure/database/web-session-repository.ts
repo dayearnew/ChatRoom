@@ -1,4 +1,4 @@
-import type { WebSessionRepository as WebSessionRepositoryPort } from "../../core/auth/session-repository.js";
+import type { WebSessionRepository as WebSessionRepositoryPort } from "#core/auth/session-repository";
 import type { AppDatabase } from "./app-database.js";
 
 export class WebSessionRepository implements WebSessionRepositoryPort {

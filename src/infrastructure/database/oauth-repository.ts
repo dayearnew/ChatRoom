@@ -3,7 +3,7 @@ import type {
   OAuthCodeRecord,
   OAuthStateRepository,
   OAuthTokenRecord,
-} from "../../core/auth/repository.js";
+} from "#core/auth/repository";
 import type { AppDatabase } from "./app-database.js";
 
 export class OAuthRepository implements OAuthStateRepository {

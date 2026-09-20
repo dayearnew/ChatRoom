@@ -1,5 +1,5 @@
-import { initializeConfig, loadConfig } from "../config/load-config.js";
-import { ApplicationLifecycle } from "../app/lifecycle.js";
+import { initializeConfig, loadConfig } from "#config/load-config";
+import { ApplicationLifecycle } from "#app/lifecycle";
 
 export async function runChatRoomCli(
   argv: string[] = process.argv.slice(2),

@@ -11,7 +11,8 @@
     "noUnusedParameters": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "customConditions": ["chatroom-source"]
   },
   "include": [
     "src/plugins/web/ui/**/*.ts",

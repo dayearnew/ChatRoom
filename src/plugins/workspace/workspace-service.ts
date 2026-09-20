@@ -1,7 +1,7 @@
 import { mkdir, readdir, realpath, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { ChatRoomError } from "../../core/errors/chatroom-error.js";
+import { ChatRoomError } from "#core/errors/chatroom-error";
 import {
   readInstructions,
   readPresetPrompt,

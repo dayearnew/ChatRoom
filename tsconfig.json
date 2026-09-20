@@ -15,7 +15,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "types": ["node"]
+    "types": ["node"],
+    "customConditions": ["chatroom-source"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "vite.config.ts"],
   "exclude": ["src/plugins/web/ui/**/*"]

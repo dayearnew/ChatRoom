@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PluginManager } from "../../src/plugins/plugin-manager.js";
+import type { LogWriter } from "../../src/core/logging/types.js";
 import type { InternalPlugin, PluginContext } from "../../src/plugins/types.js";
 
 test("PluginManager rolls back all activated plugins when startup fails", async () => {
@@ -15,7 +16,7 @@ test("PluginManager rolls back all activated plugins when startup fails", async 
       events.push(`stop:${id}`);
     },
   });
-  const manager = new PluginManager({} as PluginContext, [
+  const manager = new PluginManager(testContext(), [
     plugin("first"),
     plugin("second", true),
   ]);
@@ -39,9 +40,19 @@ test("PluginManager attempts every deactivate even when one fails", async () => 
       if (id === "second") throw new Error("stop failed");
     },
   }));
-  const manager = new PluginManager({} as PluginContext, plugins);
+  const manager = new PluginManager(testContext(), plugins);
 
   await manager.start();
   await assert.rejects(manager.stop(), /stop failed/);
   assert.deepEqual(stopped, ["third", "second", "first"]);
 });
+
+function testContext(): PluginContext {
+  const logs: LogWriter = {
+    debug() {},
+    info() {},
+    warn() {},
+    error() {},
+  };
+  return { logs } as PluginContext;
+}

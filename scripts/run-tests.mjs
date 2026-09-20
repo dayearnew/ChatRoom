@@ -14,7 +14,7 @@ if (files.length === 0) {
 
 const result = spawnSync(
   process.execPath,
-  ["--import", "tsx", "--test", ...files],
+  ["--conditions=chatroom-source", "--import", "tsx", "--test", ...files],
   { stdio: "inherit" },
 );
 

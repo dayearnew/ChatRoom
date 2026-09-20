@@ -1,32 +1,25 @@
 import { Router } from "express";
-import type { SystemLogReader } from "../../../infrastructure/logging/log-reader.js";
-import type {
-  SystemLogLevel,
-  SystemLogSink,
-} from "../../../core/logging/types.js";
-import { asyncRoute } from "../../../presentation/http/http-utils.js";
+import type { LogLevel, LogService } from "#core/logging/types";
+import { asyncRoute, boundedIntegerQuery } from "#presentation/http/http-utils";
 
-const LEVELS = new Set<SystemLogLevel>(["debug", "info", "warn", "error"]);
+const LEVELS = new Set<LogLevel>(["debug", "info", "warn", "error"]);
 
-export function createLogsApiRouter(
-  reader: SystemLogReader,
-  logger: SystemLogSink,
-): Router {
+export function createLogsApiRouter(logs: LogService): Router {
   const router = Router();
 
   router.get(
     "/logs",
     asyncRoute(async (req, res) => {
-      const limit = numberQuery(req.query.limit, 100, 500);
+      const limit = boundedIntegerQuery(req.query.limit, 100, 1, 500);
       const levels = stringSet(req.query.level)?.filter(
-        (value): value is SystemLogLevel => LEVELS.has(value as SystemLogLevel),
+        (value): value is LogLevel => LEVELS.has(value as LogLevel),
       );
       const modules = stringSet(req.query.module);
       res.json(
-        await reader.list({
+        await logs.list({
           limit,
-          ...(typeof req.query.before === "string" && req.query.before
-            ? { before: req.query.before }
+          ...(typeof req.query.cursor === "string" && req.query.cursor
+            ? { cursor: req.query.cursor }
             : {}),
           ...(levels?.length ? { levels: new Set(levels) } : {}),
           ...(modules?.length ? { modules: new Set(modules) } : {}),
@@ -44,7 +37,7 @@ export function createLogsApiRouter(
     res.write(
       `event: ready\ndata: ${JSON.stringify({ time: new Date().toISOString() })}\n\n`,
     );
-    const unsubscribe = logger.subscribe((record) => {
+    const unsubscribe = logs.subscribe((record) => {
       res.write(`event: log\ndata: ${JSON.stringify(record)}\n\n`);
     });
     const keepalive = setInterval(() => res.write(": keepalive\n\n"), 15000);
@@ -56,13 +49,6 @@ export function createLogsApiRouter(
   });
 
   return router;
-}
-
-function numberQuery(value: unknown, fallback: number, max: number): number {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0
-    ? Math.min(parsed, max)
-    : fallback;
 }
 
 function stringSet(value: unknown): string[] | null {

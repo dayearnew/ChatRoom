@@ -1,8 +1,8 @@
 import { mkdtemp, open, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { ChatRoomError } from "../../core/errors/chatroom-error.js";
-import type { CommandRunner } from "../../core/runtime/command-runner.js";
+import { ChatRoomError } from "#core/errors/chatroom-error";
+import type { CommandRunner } from "#core/runtime/command-runner";
 import type {
   GitBranch,
   GitChange,

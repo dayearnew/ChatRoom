@@ -10,7 +10,7 @@
     "clean": "node scripts/clean-dist.mjs",
     "format": "prettier --write \"src/**/*.{ts,vue,css,html}\" \"test/**/*.ts\" \"scripts/**/*.mjs\" \"*.{json,ts}\"",
     "format:check": "prettier --check \"src/**/*.{ts,vue,css,html}\" \"test/**/*.ts\" \"scripts/**/*.mjs\" \"*.{json,ts}\"",
-    "dev": "tsx watch src/cli/index.ts serve",
+    "dev": "node --conditions=chatroom-source --watch --import tsx src/cli/index.ts serve",
     "build:web": "vite build",
     "build:server": "tsc -p tsconfig.build.json && node scripts/finalize-build.mjs",
     "build": "npm run clean && npm run build:web && npm run build:server",
@@ -79,5 +79,47 @@
     "dist",
     "assets",
     "chatroom.config.example.json"
-  ]
+  ],
+  "imports": {
+    "#app/*": {
+      "chatroom-source": "./src/app/*.ts",
+      "default": "./dist/app/*.js"
+    },
+    "#auth/*": {
+      "chatroom-source": "./src/auth/*.ts",
+      "default": "./dist/auth/*.js"
+    },
+    "#cli/*": {
+      "chatroom-source": "./src/cli/*.ts",
+      "default": "./dist/cli/*.js"
+    },
+    "#config/*": {
+      "chatroom-source": "./src/config/*.ts",
+      "default": "./dist/config/*.js"
+    },
+    "#core/*": {
+      "chatroom-source": "./src/core/*.ts",
+      "default": "./dist/core/*.js"
+    },
+    "#infrastructure/*": {
+      "chatroom-source": "./src/infrastructure/*.ts",
+      "default": "./dist/infrastructure/*.js"
+    },
+    "#mcp/*": {
+      "chatroom-source": "./src/mcp/*.ts",
+      "default": "./dist/mcp/*.js"
+    },
+    "#operations/*": {
+      "chatroom-source": "./src/operations/*.ts",
+      "default": "./dist/operations/*.js"
+    },
+    "#plugins/*": {
+      "chatroom-source": "./src/plugins/*.ts",
+      "default": "./dist/plugins/*.js"
+    },
+    "#presentation/*": {
+      "chatroom-source": "./src/presentation/*.ts",
+      "default": "./dist/presentation/*.js"
+    }
+  }
 }

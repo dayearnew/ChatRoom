@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useDisplay, useLocale } from "vuetify";
-import { ApiError, api, type ProcessSnapshot } from "../api.js";
+import {
+  ApiError,
+  api,
+  type ProcessSnapshot,
+  type ProcessSummary,
+} from "../api.js";
 import { appIntlLocale } from "../locales.js";
 import { dateTime, duration } from "../utils.js";
 import { errorMessage } from "../utils/errors.js";
@@ -10,7 +15,7 @@ import CodeViewer from "./CodeViewer.vue";
 import StateChip from "./StateChip.vue";
 
 const props = defineProps<{ revision: number }>();
-const items = ref<ProcessSnapshot[]>([]);
+const items = ref<ProcessSummary[]>([]);
 const selected = ref<string | null>(null);
 const detail = ref<ProcessSnapshot | null>(null);
 const error = ref("");
@@ -52,7 +57,7 @@ async function load() {
   const request = listRequests.begin();
   error.value = "";
   try {
-    const next = await api<ProcessSnapshot[]>("/processes", {
+    const next = await api<ProcessSummary[]>("/processes", {
       signal: request.signal,
     });
     if (!listRequests.isCurrent(request)) return;

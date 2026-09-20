@@ -1,9 +1,6 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { ZodError } from "zod";
-import {
-  asChatRoomError,
-  ChatRoomError,
-} from "../../core/errors/chatroom-error.js";
+import { asChatRoomError, ChatRoomError } from "#core/errors/chatroom-error";
 
 export function asyncRoute(
   handler: (
@@ -28,7 +25,9 @@ export function errorMiddleware(
       ? new ChatRoomError("INVALID_INPUT", "Invalid request", {
           issues: error.issues,
         })
-      : asChatRoomError(error);
+      : isBodyParseError(error)
+        ? new ChatRoomError("INVALID_INPUT", "Invalid JSON request body")
+        : asChatRoomError(error);
   res.status(statusForErrorCode(normalized.code)).json({
     error: {
       code: normalized.code,
@@ -36,6 +35,14 @@ export function errorMiddleware(
       details: normalized.details ?? null,
     },
   });
+}
+
+function isBodyParseError(
+  error: unknown,
+): error is SyntaxError & { status: number; type: string } {
+  if (!(error instanceof SyntaxError)) return false;
+  const value = error as SyntaxError & { status?: unknown; type?: unknown };
+  return value.status === 400 && value.type === "entity.parse.failed";
 }
 
 function statusForErrorCode(code: ChatRoomError["code"]): number {
@@ -61,6 +68,18 @@ export function requireString(value: unknown, name: string): string {
   if (typeof value !== "string" || !value)
     throw new ChatRoomError("INVALID_INPUT", `${name} is required`);
   return value;
+}
+
+export function boundedIntegerQuery(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= min
+    ? Math.min(parsed, max)
+    : fallback;
 }
 
 export function bodyRecord(value: unknown): Record<string, unknown> {

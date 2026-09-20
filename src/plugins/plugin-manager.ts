@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/server";
-import { PluginMcpRegistrar } from "../mcp/server/plugin-mcp-registrar.js";
+import { PluginMcpRegistrar } from "#mcp/server/plugin-mcp-registrar";
 import type { InternalPlugin, PluginContext } from "./types.js";
 
 export class PluginManager {
@@ -16,14 +16,14 @@ export class PluginManager {
         this.active.push(plugin);
         try {
           await plugin.activate(this.context);
-          this.context.logger?.info(
+          this.context.logs.info(
             "plugin",
             "plugin.activated",
             `Plugin activated: ${plugin.id}`,
             { pluginId: plugin.id },
           );
         } catch (error) {
-          this.context.logger?.error(
+          this.context.logs.error(
             "plugin",
             "plugin.activate_failed",
             `Plugin activation failed: ${plugin.id}`,
@@ -76,7 +76,7 @@ export class PluginManager {
       try {
         await plugin.deactivate?.();
       } catch (error) {
-        this.context.logger?.error(
+        this.context.logs.error(
           "plugin",
           "plugin.deactivate_failed",
           `Plugin deactivation failed: ${plugin.id}`,

@@ -1,11 +1,11 @@
 import { z } from "zod";
-import type { PluginMcpRegistrar } from "../../mcp/server/plugin-mcp-registrar.js";
+import type { PluginMcpRegistrar } from "#mcp/server/plugin-mcp-registrar";
 import {
   closedRead,
   destructiveLocalMutation,
   openWorldMutation,
   processSnapshotSchema,
-} from "../../mcp/server/tool-support.js";
+} from "#mcp/server/tool-support";
 import type { ProcessSupervisor } from "./process-supervisor.js";
 
 export function registerProcessTools(

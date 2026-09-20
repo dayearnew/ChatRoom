@@ -1,6 +1,7 @@
-import type { ChatRoomConfig } from "../config/types.js";
-import { CHATROOM_VERSION } from "../core/runtime/identity.js";
-import { SystemLogger } from "../infrastructure/logging/logger.js";
+import type { ChatRoomConfig } from "#config/types";
+import { CHATROOM_VERSION } from "#core/runtime/identity";
+import { FileLogStore } from "#infrastructure/logging/file-log-store";
+import { SystemLog } from "#infrastructure/logging/system-log";
 import {
   createApplication,
   type ApplicationComponents,
@@ -8,64 +9,91 @@ import {
 
 export class ApplicationLifecycle {
   private components: ApplicationComponents | null = null;
+  private starting: Promise<ApplicationComponents> | null = null;
   private shuttingDown: Promise<void> | null = null;
-  private readonly logger: SystemLogger;
+  private readonly logs: SystemLog;
 
   constructor(private readonly config: ChatRoomConfig) {
-    this.logger = new SystemLogger(config.dataDir);
+    this.logs = new SystemLog(new FileLogStore(config.dataDir));
   }
 
   async start(): Promise<ApplicationComponents> {
+    if (this.shuttingDown) await this.shuttingDown;
     if (this.components) return this.components;
-    this.logger.info("app", "app.starting", "ChatRoom is starting", {
+    if (this.starting) return this.starting;
+
+    const starting = this.startInternal();
+    this.starting = starting;
+    try {
+      return await starting;
+    } finally {
+      if (this.starting === starting) this.starting = null;
+    }
+  }
+
+  private async startInternal(): Promise<ApplicationComponents> {
+    this.logs.info("app", "app.starting", "ChatRoom is starting", {
       version: CHATROOM_VERSION,
     });
     let components: ApplicationComponents | null = null;
     try {
-      components = await createApplication(this.config, this.logger);
+      components = await createApplication(this.config, this.logs);
       await components.http.start();
       await components.cloud.start();
       this.components = components;
-      this.logger.info("app", "app.started", "ChatRoom started", {
+      this.logs.info("app", "app.started", "ChatRoom started", {
         version: CHATROOM_VERSION,
       });
       return components;
     } catch (error) {
-      this.logger.error("app", "app.start_failed", "ChatRoom failed to start", {
+      this.logs.error("app", "app.start_failed", "ChatRoom failed to start", {
         error,
       });
       if (components) {
         try {
           await cleanupComponents(components);
         } catch (cleanupError) {
-          await this.logger.flush();
+          await this.logs.flush();
           throw new AggregateError(
             [error, cleanupError],
             "Application startup failed and cleanup encountered errors",
           );
         }
       }
-      await this.logger.flush();
+      await this.logs.flush();
       throw error;
     }
   }
 
   async shutdown(): Promise<void> {
     if (this.shuttingDown) return this.shuttingDown;
-    this.shuttingDown = this.shutdownInternal();
-    return this.shuttingDown;
+    const shutdown = this.shutdownInternal();
+    this.shuttingDown = shutdown;
+    try {
+      await shutdown;
+    } finally {
+      if (this.shuttingDown === shutdown) this.shuttingDown = null;
+    }
   }
 
   private async shutdownInternal(): Promise<void> {
+    if (this.starting) {
+      try {
+        await this.starting;
+      } catch {
+        return;
+      }
+    }
+
     const components = this.components;
     if (!components) return;
     this.components = null;
-    this.logger.info("app", "app.stopping", "ChatRoom is stopping");
+    this.logs.info("app", "app.stopping", "ChatRoom is stopping");
     try {
       await cleanupComponents(components);
-      this.logger.info("app", "app.stopped", "ChatRoom stopped");
+      this.logs.info("app", "app.stopped", "ChatRoom stopped");
     } catch (error) {
-      this.logger.error(
+      this.logs.error(
         "app",
         "app.stop_failed",
         "ChatRoom shutdown encountered errors",
@@ -75,7 +103,7 @@ export class ApplicationLifecycle {
       );
       throw error;
     } finally {
-      await this.logger.flush();
+      await this.logs.flush();
     }
   }
 }

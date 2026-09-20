@@ -99,7 +99,7 @@ async function loadMore() {
 
 async function refreshLoaded() {
   const request = listRequests.begin();
-  loadingMore.value = false;
+  loadingMore.value = true;
   error.value = "";
   const target = Math.max(events.value.length, PAGE_SIZE);
   const refreshed: Operation[] = [];
@@ -118,10 +118,12 @@ async function refreshLoaded() {
     events.value = refreshed;
     hasMore.value = refreshed.length >= target;
     if (selected.value) await loadDetail();
-    await continueLoadingIfVisible();
   } catch (cause) {
     if (listRequests.isCurrent(request)) error.value = errorMessage(cause);
+  } finally {
+    if (listRequests.isCurrent(request)) loadingMore.value = false;
   }
+  if (listRequests.isCurrent(request)) await continueLoadingIfVisible();
 }
 
 async function continueLoadingIfVisible() {

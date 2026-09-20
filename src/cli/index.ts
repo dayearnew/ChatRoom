@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { asChatRoomError } from "../core/errors/chatroom-error.js";
+import { asChatRoomError } from "#core/errors/chatroom-error";
 import { runChatRoomCli } from "./run-cli.js";
 
 void runChatRoomCli().catch((error) => {

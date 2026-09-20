@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
-import type { ComputerService } from "../../computer/computer-service.js";
-import type { OperationLog } from "../../../operations/operation-log.js";
-import type { IngressPolicy } from "../../../auth/ingress-policy.js";
-import { asyncRoute } from "../../../presentation/http/http-utils.js";
-import { ChatRoomError } from "../../../core/errors/chatroom-error.js";
+import type { ComputerService } from "#plugins/computer/computer-service";
+import type { OperationLog } from "#operations/operation-log";
+import type { IngressPolicy } from "#auth/ingress-policy";
+import { asyncRoute } from "#presentation/http/http-utils";
+import { ChatRoomError } from "#core/errors/chatroom-error";
 
 const settingsPatchSchema = z
   .object({

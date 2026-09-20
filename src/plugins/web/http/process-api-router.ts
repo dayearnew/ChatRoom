@@ -1,9 +1,6 @@
 import { Router } from "express";
-import type { WebRuntime } from "../runtime.js";
-import {
-  asyncRoute,
-  requireString,
-} from "../../../presentation/http/http-utils.js";
+import type { WebRuntime } from "#plugins/web/runtime";
+import { asyncRoute, requireString } from "#presentation/http/http-utils";
 
 export function createProcessApiRouter(application: WebRuntime): Router {
   const router = Router();

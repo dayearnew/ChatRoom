@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { PluginMcpRegistrar } from "../../mcp/server/plugin-mcp-registrar.js";
-import { closedRead } from "../../mcp/server/tool-support.js";
+import type { PluginMcpRegistrar } from "#mcp/server/plugin-mcp-registrar";
+import { closedRead } from "#mcp/server/tool-support";
 import type { WorkspaceService } from "./workspace-service.js";
 
 const workspaceInfoSchema = z.object({

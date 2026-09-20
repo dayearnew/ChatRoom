@@ -21,6 +21,14 @@ test("OAuth authorization code uses PKCE, hashing, expiry model and one-time con
       webPublicBaseUrl: null,
       allowedRedirectHosts: ["127.0.0.1"],
     });
+    assert.throws(() =>
+      auth.registerClient("Invalid Scheme", ["file://127.0.0.1/callback"]),
+    );
+    assert.throws(() =>
+      auth.registerClient("Fragment Redirect", [
+        "http://127.0.0.1/callback#fragment",
+      ]),
+    );
     const client = auth.registerClient("Test MCP", [
       "http://127.0.0.1/callback",
     ]);

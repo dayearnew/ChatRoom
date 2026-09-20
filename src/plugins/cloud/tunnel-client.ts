@@ -229,6 +229,7 @@ export class CloudTunnelClient {
       return;
     }
     const headers = sanitizeHeaders(message.headers);
+    headers.host = publicHost(this.lease, message.service);
     const request = http.request(
       {
         host: this.local.host,
@@ -423,6 +424,13 @@ function signChallenge(
     key,
   ).toString("base64url");
 }
+function publicHost(lease: CloudLeaseState, service: PublicService): string {
+  const baseUrl = service === "mcp" ? lease.mcpBaseUrl : lease.webBaseUrl;
+  if (!baseUrl)
+    throw new Error("Tunnel lease is missing " + service + " public base URL");
+  return new URL(baseUrl).host;
+}
+
 function allowedPath(service: PublicService, value: string): boolean {
   const pathname = new URL(value, "http://localhost").pathname;
   if (service === "mcp")
@@ -442,6 +450,7 @@ function sanitizeHeaders(
 ): Record<string, string> {
   const blocked = new Set([
     "connection",
+    "host",
     "proxy-connection",
     "keep-alive",
     "transfer-encoding",

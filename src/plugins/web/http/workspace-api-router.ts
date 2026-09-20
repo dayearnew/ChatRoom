@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { ChatRoomError } from "../../../core/errors/chatroom-error.js";
+import { ChatRoomError } from "#core/errors/chatroom-error";
 import {
   asyncRoute,
   bodyRecord,
   requireString,
-} from "../../../presentation/http/http-utils.js";
-import type { WebRuntime } from "../runtime.js";
+} from "#presentation/http/http-utils";
+import type { WebRuntime } from "#plugins/web/runtime";
 
 const MAX_WRITE_BYTES = 1024 * 1024;
 

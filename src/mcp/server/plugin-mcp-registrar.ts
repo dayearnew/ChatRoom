@@ -5,8 +5,8 @@ import type {
   ToolCallback,
   CallToolResult,
 } from "@modelcontextprotocol/server";
-import { asChatRoomError } from "../../core/errors/chatroom-error.js";
-import type { OperationLog } from "../../operations/operation-log.js";
+import { asChatRoomError } from "#core/errors/chatroom-error";
+import type { OperationLog } from "#operations/operation-log";
 import { mcpTool } from "./tool-support.js";
 import type { McpToolControl } from "./tool-control.js";
 

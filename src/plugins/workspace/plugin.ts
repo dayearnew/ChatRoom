@@ -1,5 +1,5 @@
-import type { InternalPlugin } from "../types.js";
-import { createServiceToken } from "../types.js";
+import type { InternalPlugin } from "#plugins/types";
+import { createServiceToken } from "#plugins/types";
 import { registerWorkspaceTools } from "./mcp.js";
 import { WorkspaceService } from "./workspace-service.js";
 

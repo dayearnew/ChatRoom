@@ -20,6 +20,43 @@ for (const file of files.filter((entry) => /\.(?:ts|tsx|vue)$/.test(entry))) {
   const relative = path.relative(root, file).split(path.sep).join("/");
   const content = await readFile(file, "utf8");
 
+  if (!relative.startsWith("src/plugins/web/ui/")) {
+    for (const match of content.matchAll(
+      /(?:from\s+|import\s*\(\s*)["']((?:\.\.\/)+[^"']+)["']/g,
+    )) {
+      const specifier = match[1];
+      const parentPrefix = /^(?:\.\.\/)+/.exec(specifier)?.[0] ?? "";
+      const parentDepth = parentPrefix.length / 3;
+      if (parentDepth > 1) {
+        violations.push(
+          `${relative}: deep parent import "${specifier}" is not allowed; use a #<area>/... package import`,
+        );
+        continue;
+      }
+
+      const sourceParts = path.relative(src, file).split(path.sep);
+      const target = path.resolve(path.dirname(file), specifier);
+      const targetParts = path.relative(src, target).split(path.sep);
+      if (targetParts[0] === ".." || sourceParts[0] !== targetParts[0]) {
+        violations.push(
+          `${relative}: cross-area parent import "${specifier}" is not allowed; use a #<area>/... package import`,
+        );
+        continue;
+      }
+
+      if (
+        sourceParts[0] === "plugins" &&
+        sourceParts.length > 2 &&
+        targetParts.length > 2 &&
+        sourceParts[1] !== targetParts[1]
+      ) {
+        violations.push(
+          `${relative}: plugin parent import "${specifier}" crosses plugin boundaries`,
+        );
+      }
+    }
+  }
+
   if (
     content.includes("node:child_process") &&
     !childProcessAllowed.has(relative)
@@ -61,22 +98,18 @@ for (const file of files.filter((entry) => /\.(?:ts|tsx|vue)$/.test(entry))) {
     );
   }
 
-  if (
-    relative.startsWith("src/plugins/git/") &&
-    /from\s+["'][^"']*workspace\//.test(content)
-  ) {
-    violations.push(
-      `${relative}: Git plugin must not depend on Workspace plugin`,
-    );
-  }
-
-  if (
-    relative.startsWith("src/plugins/workspace/") &&
-    /from\s+["'][^"']*git\//.test(content)
-  ) {
-    violations.push(
-      `${relative}: Workspace plugin must not depend on Git plugin`,
-    );
+  const plugin = /^src\/plugins\/([^/]+)\//.exec(relative)?.[1];
+  if (plugin && plugin !== "web") {
+    for (const match of content.matchAll(
+      /(?:from\s+|import\s*\(\s*)["']#plugins\/([^/"']+)\//g,
+    )) {
+      const dependency = match[1];
+      if (dependency !== plugin) {
+        violations.push(
+          `${relative}: ${plugin} plugin must not depend on ${dependency} plugin`,
+        );
+      }
+    }
   }
 
   if (relative.endsWith(".tsx")) {
@@ -104,6 +137,23 @@ for (const relative of [
 }
 
 const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+const sourceAreas = (await readdir(src, { withFileTypes: true }))
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+for (const area of sourceAreas) {
+  const key = `#${area}/*`;
+  const mapping = pkg.imports?.[key];
+  if (
+    mapping?.["chatroom-source"] !== `./src/${area}/*.ts` ||
+    mapping?.default !== `./dist/${area}/*.js`
+  ) {
+    violations.push(
+      `package.json: missing or invalid internal import mapping ${key}`,
+    );
+  }
+}
+
 const dependencies = {
   ...(pkg.dependencies ?? {}),
   ...(pkg.devDependencies ?? {}),

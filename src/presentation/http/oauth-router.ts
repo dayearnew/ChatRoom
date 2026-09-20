@@ -1,20 +1,14 @@
 import { Router, type ErrorRequestHandler } from "express";
-import type {
-  AuthService,
-  AuthorizationRequest,
-} from "../../auth/auth-service.js";
-import type { IngressPolicy } from "../../auth/ingress-policy.js";
-import type { SystemLogSink } from "../../core/logging/types.js";
-import {
-  asChatRoomError,
-  ChatRoomError,
-} from "../../core/errors/chatroom-error.js";
-import { escapeHtml, requireString } from "./http-utils.js";
+import type { AuthService, AuthorizationRequest } from "#auth/auth-service";
+import type { IngressPolicy } from "#auth/ingress-policy";
+import type { LogWriter } from "#core/logging/types";
+import { asChatRoomError, ChatRoomError } from "#core/errors/chatroom-error";
+import { bodyRecord, escapeHtml, requireString } from "./http-utils.js";
 
 export function createOAuthRouter(
   auth: AuthService,
   ingress: IngressPolicy,
-  logger: SystemLogSink,
+  logs: LogWriter,
 ): Router {
   const router = Router();
   router.get("/.well-known/oauth-authorization-server", (req, res) =>
@@ -28,7 +22,7 @@ export function createOAuthRouter(
   );
 
   router.post("/oauth/register", (req, res) => {
-    const body = req.body as Record<string, unknown>;
+    const body = bodyRecord(req.body);
     const name =
       typeof body.client_name === "string" ? body.client_name : "MCP Client";
     const redirects = Array.isArray(body.redirect_uris)
@@ -50,13 +44,13 @@ export function createOAuthRouter(
     res.type("html").send(authorizationPage(request));
   });
   router.post("/oauth/authorize", (req, res) => {
-    const body = req.body as Record<string, unknown>;
+    const body = bodyRecord(req.body);
     const request = authorizationRequest(body);
     const code = auth.approveAuthorization(
       request,
       requireString(body.owner_token, "owner_token"),
     );
-    logger.info("auth", "oauth.success", "OAuth authorization approved", {
+    logs.info("auth", "oauth.success", "OAuth authorization approved", {
       flow: "authorization",
     });
     const redirect = new URL(request.redirectUri);
@@ -65,7 +59,7 @@ export function createOAuthRouter(
     res.redirect(303, redirect.toString());
   });
   router.post("/oauth/token", (req, res) => {
-    const body = req.body as Record<string, unknown>;
+    const body = bodyRecord(req.body);
     let result;
     if (body.grant_type === "authorization_code") {
       result = auth.exchangeCode({
@@ -84,23 +78,23 @@ export function createOAuthRouter(
     } else {
       throw new ChatRoomError("INVALID_INPUT", "Unsupported OAuth grant_type");
     }
-    logger.info("auth", "oauth.success", "OAuth token issued", {
+    logs.info("auth", "oauth.success", "OAuth token issued", {
       flow: typeof body.grant_type === "string" ? body.grant_type : "unknown",
     });
     res.setHeader("Cache-Control", "no-store");
     res.json(result);
   });
   router.post("/oauth/revoke", (req, res) => {
-    const body = req.body as Record<string, unknown>;
+    const body = bodyRecord(req.body);
     const token = typeof body.token === "string" ? body.token : "";
     if (token) auth.revoke(token);
     res.status(200).end();
   });
-  router.use(oauthErrorMiddleware(logger));
+  router.use(oauthErrorMiddleware(logs));
   return router;
 }
 
-function oauthErrorMiddleware(logger: SystemLogSink): ErrorRequestHandler {
+function oauthErrorMiddleware(logs: LogWriter): ErrorRequestHandler {
   return (error, req, res, _next) => {
     const normalized = asChatRoomError(error);
     let code = "invalid_request";
@@ -112,7 +106,7 @@ function oauthErrorMiddleware(logger: SystemLogSink): ErrorRequestHandler {
     )
       code = "invalid_redirect_uri";
     else if (normalized.code === "FORBIDDEN") code = "access_denied";
-    logger.warn("auth", "oauth.failed", "OAuth request failed", {
+    logs.warn("auth", "oauth.failed", "OAuth request failed", {
       path: req.path,
       reason: code,
     });

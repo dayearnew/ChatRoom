@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { ChatRoomError } from "../../core/errors/chatroom-error.js";
-import type { RuntimeEventBus } from "../../app/event-bus.js";
+import { ChatRoomError } from "#core/errors/chatroom-error";
+import type { RuntimeEventBus } from "#app/event-bus";
 import type { ComputerSettingsRepository } from "./computer-settings-repository.js";
 import type {
   ComputerAccessScope,

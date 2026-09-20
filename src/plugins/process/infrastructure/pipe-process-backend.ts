@@ -41,7 +41,16 @@ class PipeBackendProcess implements BackendProcess {
         stdio: "ignore",
         windowsHide: true,
       });
-      killer.once("error", () => this.child.kill(signal));
+      let fellBack = false;
+      const fallback = () => {
+        if (fellBack) return;
+        fellBack = true;
+        this.child.kill(signal);
+      };
+      killer.once("error", fallback);
+      killer.once("exit", (code) => {
+        if (code !== 0) fallback();
+      });
       return;
     }
     try {

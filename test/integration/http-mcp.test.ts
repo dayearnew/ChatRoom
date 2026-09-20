@@ -203,6 +203,17 @@ test("remote WebUI mutations require same-origin while loopback WebUI stays loca
     });
     assert.equal(rejected.status, 403);
 
+    const invalidBody = await requestWithHost(address.port, "/api/auth/login", {
+      method: "POST",
+      host: "chatroom.example.com",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://chatroom.example.com",
+      },
+      body: "null",
+    });
+    assert.equal(invalidBody.status, 400);
+
     const accepted = await requestWithHost(address.port, "/api/auth/login", {
       method: "POST",
       host: "chatroom.example.com",

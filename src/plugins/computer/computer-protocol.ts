@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  ChatRoomError,
-  type ErrorCode,
-} from "../../core/errors/chatroom-error.js";
+import { ChatRoomError, type ErrorCode } from "#core/errors/chatroom-error";
 import {
   computerActionResultSchema,
   computerNativeStatusSchema,
@@ -33,19 +30,24 @@ interface ComputerNativeError {
 
 const responseEnvelopeSchema = z
   .object({
-    protocol: z.literal(COMPUTER_NATIVE_PROTOCOL_VERSION).optional(),
-    id: z.string(),
+    protocol: z.literal(COMPUTER_NATIVE_PROTOCOL_VERSION),
+    id: z.string().min(1),
     result: z.unknown().optional(),
     error: z
       .object({
         code: z.string().optional(),
         message: z.string(),
       })
+      .strict()
       .optional(),
   })
-  .refine((value) => value.result !== undefined || value.error !== undefined, {
-    message: "Native response must contain result or error",
-  });
+  .strict()
+  .refine(
+    (value) => (value.result === undefined) !== (value.error === undefined),
+    {
+      message: "Native response must contain exactly one of result or error",
+    },
+  );
 
 export function parseNativeEnvelope(value: unknown): {
   id: string;

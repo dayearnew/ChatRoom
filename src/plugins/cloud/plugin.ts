@@ -1,5 +1,5 @@
-import type { InternalPlugin } from "../types.js";
-import { createServiceToken } from "../types.js";
+import type { InternalPlugin } from "#plugins/types";
+import { createServiceToken } from "#plugins/types";
 import { CloudController } from "./controller.js";
 
 export const CloudService = createServiceToken<CloudController>("cloud");
@@ -12,8 +12,8 @@ export function createCloudPlugin(): InternalPlugin {
     async activate(context) {
       controller = await CloudController.create(
         context.config,
+        context.logs,
         context.externalAccess,
-        context.logger,
       );
       context.services.provide(CloudService, controller);
     },

@@ -1,4 +1,4 @@
-import type { ChatRoomConfig } from "../config/types.js";
+import type { ChatRoomConfig } from "#config/types";
 
 export type ExternalAccessKind = "mcp" | "web";
 

@@ -1,15 +1,18 @@
 import { Router } from "express";
-import type { WebRuntime } from "../runtime.js";
-import type { RuntimeEventBus } from "../../../app/event-bus.js";
-import type { AuthService } from "../../../auth/auth-service.js";
-import type { PasskeyService } from "../../../auth/passkey-service.js";
-import { ChatRoomError } from "../../../core/errors/chatroom-error.js";
-import { requireString } from "../../../presentation/http/http-utils.js";
+import type { WebRuntime } from "#plugins/web/runtime";
+import type { RuntimeEventBus } from "#app/event-bus";
+import type { AuthService } from "#auth/auth-service";
+import type { PasskeyService } from "#auth/passkey-service";
+import { ChatRoomError } from "#core/errors/chatroom-error";
+import {
+  boundedIntegerQuery,
+  requireString,
+} from "#presentation/http/http-utils";
 import { createProcessApiRouter } from "./process-api-router.js";
 import { createWorkspaceApiRouter } from "./workspace-api-router.js";
 import { createGitApiRouter } from "./git-api-router.js";
-import type { IngressPolicy } from "../../../auth/ingress-policy.js";
-import type { CloudController } from "../../cloud/controller.js";
+import type { IngressPolicy } from "#auth/ingress-policy";
+import type { CloudController } from "#plugins/cloud/controller";
 import { createCloudApiRouter } from "./cloud-api-router.js";
 import { createComputerApiRouter } from "./computer-api-router.js";
 import {
@@ -19,8 +22,7 @@ import {
 } from "./auth-api-router.js";
 import { createRuntimeApiRouter } from "./runtime-api-router.js";
 import { createLogsApiRouter } from "./logs-api-router.js";
-import type { SystemLogSink } from "../../../core/logging/types.js";
-import type { SystemLogReader } from "../../../infrastructure/logging/log-reader.js";
+import type { LogService } from "#core/logging/types";
 
 export function createApiRouter(
   application: WebRuntime,
@@ -29,8 +31,7 @@ export function createApiRouter(
   passkeys: PasskeyService,
   ingress: IngressPolicy,
   cloud: CloudController,
-  logger: SystemLogSink,
-  logReader: SystemLogReader,
+  logs: LogService,
   runtimeStatus: () => {
     version: string;
     mcpRequests: number;
@@ -38,17 +39,17 @@ export function createApiRouter(
   },
 ): Router {
   const router = Router();
-  router.use(createPublicAuthApiRouter(auth, passkeys, ingress, logger));
+  router.use(createPublicAuthApiRouter(auth, passkeys, ingress, logs));
   router.use(apiAuthentication(auth, ingress));
-  router.use(createPrivateAuthApiRouter(passkeys, ingress, logger));
+  router.use(createPrivateAuthApiRouter(passkeys, ingress, logs));
   router.use(createRuntimeApiRouter(application, eventBus, runtimeStatus));
-  router.use(createLogsApiRouter(logReader, logger));
+  router.use(createLogsApiRouter(logs));
 
   router.get("/operations", (req, res) => {
     res.json(
       application.operations.list({
-        limit: numberQuery(req.query.limit, 100, 500),
-        offset: numberQuery(req.query.offset, 0, 100000),
+        limit: boundedIntegerQuery(req.query.limit, 100, 0, 500),
+        offset: boundedIntegerQuery(req.query.offset, 0, 0, 100000),
         ...(typeof req.query.pluginId === "string"
           ? { pluginId: req.query.pluginId }
           : {}),
@@ -80,11 +81,4 @@ export function createApiRouter(
   );
   router.use(createCloudApiRouter(cloud, application.operations));
   return router;
-}
-
-function numberQuery(value: unknown, fallback: number, max: number): number {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 0
-    ? Math.min(parsed, max)
-    : fallback;
 }

@@ -1,8 +1,19 @@
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
-const app = path.resolve("dist/native/macos/ChatRoomComputerHelper.app");
+const out = path.resolve("dist/native/macos");
+const finalApp = path.join(out, "ChatRoomComputerHelper.app");
+const app = path.join(
+  out,
+  ".ChatRoomComputerHelper.build-" + process.pid + ".app",
+);
 const contents = path.join(app, "Contents");
 const macos = path.join(contents, "MacOS");
 const executable = path.join(macos, "chatroom-computer-helper");
@@ -21,46 +32,52 @@ const architectures = (process.env.CHATROOM_MACOS_ARCHS ?? "arm64,x86_64")
   .map((value) => value.trim())
   .filter(Boolean);
 
-rmSync(app, { recursive: true, force: true });
-mkdirSync(macos, { recursive: true });
-
-const slices = architectures.map((architecture) => {
-  const output = path.join(macos, `chatroom-computer-helper.${architecture}`);
-  run("xcrun", [
-    "--sdk",
-    "macosx",
-    "swiftc",
-    ...sources,
-    "-O",
-    "-target",
-    `${architecture}-apple-macos${deploymentTarget}`,
-    "-framework",
-    "AppKit",
-    "-framework",
-    "ApplicationServices",
-    "-framework",
-    "ScreenCaptureKit",
-    "-framework",
-    "ImageIO",
-    "-framework",
-    "UniformTypeIdentifiers",
-    "-o",
-    output,
-  ]);
-  return output;
-});
-
-if (slices.length === 1) {
-  run("cp", [slices[0], executable]);
-} else {
-  run("xcrun", ["lipo", "-create", ...slices, "-output", executable]);
+const identity = process.env.CHATROOM_MACOS_SIGN_IDENTITY?.trim();
+if (!identity) {
+  throw new Error("CHATROOM_MACOS_SIGN_IDENTITY is required");
 }
-for (const slice of slices) rmSync(slice, { force: true });
-chmodSync(executable, 0o755);
 
-writeFileSync(
-  path.join(contents, "Info.plist"),
-  `<?xml version="1.0" encoding="UTF-8"?>
+rmSync(app, { recursive: true, force: true });
+try {
+  mkdirSync(macos, { recursive: true });
+
+  const slices = architectures.map((architecture) => {
+    const output = path.join(macos, `chatroom-computer-helper.${architecture}`);
+    run("xcrun", [
+      "--sdk",
+      "macosx",
+      "swiftc",
+      ...sources,
+      "-O",
+      "-target",
+      `${architecture}-apple-macos${deploymentTarget}`,
+      "-framework",
+      "AppKit",
+      "-framework",
+      "ApplicationServices",
+      "-framework",
+      "ScreenCaptureKit",
+      "-framework",
+      "ImageIO",
+      "-framework",
+      "UniformTypeIdentifiers",
+      "-o",
+      output,
+    ]);
+    return output;
+  });
+
+  if (slices.length === 1) {
+    run("cp", [slices[0], executable]);
+  } else {
+    run("xcrun", ["lipo", "-create", ...slices, "-output", executable]);
+  }
+  for (const slice of slices) rmSync(slice, { force: true });
+  chmodSync(executable, 0o755);
+
+  writeFileSync(
+    path.join(contents, "Info.plist"),
+    `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>com.chatroomcp.computer</string>
@@ -74,41 +91,46 @@ writeFileSync(
 <key>LSUIElement</key><true/>
 <key>NSHumanReadableCopyright</key><string>ChatRoom</string>
 </dict></plist>\n`,
-);
+  );
 
-const identity = process.env.CHATROOM_MACOS_SIGN_IDENTITY?.trim();
-if (!identity) {
-  throw new Error("CHATROOM_MACOS_SIGN_IDENTITY is required");
-}
-run("codesign", [
-  "--force",
-  "--deep",
-  "--sign",
-  identity,
-  "--options",
-  "runtime",
-  app,
-]);
-run("codesign", ["--verify", "--deep", "--strict", app]);
-
-const notaryProfile = process.env.CHATROOM_MACOS_NOTARY_PROFILE;
-if (notaryProfile) {
-  const archive = path.resolve("dist/native/macos/ChatRoomComputerHelper.zip");
-  rmSync(archive, { force: true });
-  run("ditto", ["-c", "-k", "--keepParent", app, archive]);
-  run("xcrun", [
-    "notarytool",
-    "submit",
-    archive,
-    "--keychain-profile",
-    notaryProfile,
-    "--wait",
+  run("codesign", [
+    "--force",
+    "--deep",
+    "--sign",
+    identity,
+    "--options",
+    "runtime",
+    app,
   ]);
-  run("xcrun", ["stapler", "staple", app]);
-  rmSync(archive, { force: true });
+  run("codesign", ["--verify", "--deep", "--strict", app]);
+
+  const notaryProfile = process.env.CHATROOM_MACOS_NOTARY_PROFILE;
+  if (notaryProfile) {
+    const archive = path.resolve(
+      "dist/native/macos/ChatRoomComputerHelper.zip",
+    );
+    rmSync(archive, { force: true });
+    run("ditto", ["-c", "-k", "--keepParent", app, archive]);
+    run("xcrun", [
+      "notarytool",
+      "submit",
+      archive,
+      "--keychain-profile",
+      notaryProfile,
+      "--wait",
+    ]);
+    run("xcrun", ["stapler", "staple", app]);
+    rmSync(archive, { force: true });
+  }
+
+  rmSync(finalApp, { recursive: true, force: true });
+  renameSync(app, finalApp);
+} finally {
+  rmSync(app, { recursive: true, force: true });
 }
 
 function run(command, args) {
   const result = spawnSync(command, args, { stdio: "inherit" });
-  if (result.status !== 0) process.exit(result.status ?? 1);
+  if (result.status !== 0)
+    throw new Error(command + " exited with code " + (result.status ?? 1));
 }

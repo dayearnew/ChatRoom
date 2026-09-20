@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
-import type { OperationLog } from "../../../operations/operation-log.js";
-import type { CloudController } from "../../cloud/controller.js";
-import { CLOUD_SERVICE_SCHEMA } from "../../cloud/types.js";
-import { asyncRoute } from "../../../presentation/http/http-utils.js";
+import type { OperationLog } from "#operations/operation-log";
+import type { CloudController } from "#plugins/cloud/controller";
+import { CLOUD_SERVICE_SCHEMA } from "#plugins/cloud/types";
+import { asyncRoute } from "#presentation/http/http-utils";
 
 export function createCloudApiRouter(
   controller: CloudController,

@@ -1,6 +1,6 @@
-import { CommandRunner } from "../../core/runtime/command-runner.js";
-import type { InternalPlugin } from "../types.js";
-import { createServiceToken } from "../types.js";
+import { CommandRunner } from "#core/runtime/command-runner";
+import type { InternalPlugin } from "#plugins/types";
+import { createServiceToken } from "#plugins/types";
 import { GitService } from "./git-service.js";
 
 export const GitServiceToken = createServiceToken<GitService>("git");

@@ -1,4 +1,4 @@
-import type { McpToolSettingStore } from "../../mcp/server/tool-control.js";
+import type { McpToolSettingStore } from "#mcp/server/tool-control";
 import type { AppDatabase } from "./app-database.js";
 
 export class McpToolSettingsRepository implements McpToolSettingStore {

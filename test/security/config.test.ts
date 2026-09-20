@@ -24,3 +24,28 @@ test("remote binding cannot run without authentication", async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("public base URLs must be HTTP(S) origins", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "chatroom-config-url-"));
+  const file = path.join(dir, "config.json");
+  try {
+    for (const value of [
+      "file://chatroom.example.com/",
+      "https://chatroom.example.com/base",
+      "https://chatroom.example.com/?mode=remote",
+    ]) {
+      const config = defaultConfig();
+      config.allowedRoots = [dir];
+      config.auth.ownerToken = "owner-secret";
+      config.auth.mcpPublicBaseUrl = value;
+      await writeFile(file, JSON.stringify(config));
+      await assert.rejects(
+        loadConfig(file),
+        (error: unknown) =>
+          error instanceof ChatRoomError && error.code === "INVALID_INPUT",
+      );
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

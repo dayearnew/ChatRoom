@@ -4,9 +4,9 @@ import {
   bodyRecord,
   requireString,
   requireStringArray,
-} from "../../../presentation/http/http-utils.js";
-import type { GitStatus } from "../../git/types.js";
-import type { WebRuntime } from "../runtime.js";
+} from "#presentation/http/http-utils";
+import type { GitStatus } from "#plugins/git/types";
+import type { WebRuntime } from "#plugins/web/runtime";
 
 export function createGitApiRouter(application: WebRuntime): Router {
   const router = Router();

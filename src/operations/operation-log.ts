@@ -3,18 +3,15 @@ import type {
   Operation,
   OperationStart,
   OperationStatus,
-} from "../core/operations/types.js";
-import { boundJson } from "../core/operations/bounded-value.js";
-import { SecretRedactor } from "../core/operations/redactor.js";
-import {
-  asChatRoomError,
-  ChatRoomError,
-} from "../core/errors/chatroom-error.js";
+} from "#core/operations/types";
+import { boundJson } from "#core/operations/bounded-value";
+import { SecretRedactor } from "#core/operations/redactor";
+import { asChatRoomError, ChatRoomError } from "#core/errors/chatroom-error";
 import type {
   OperationQuery,
   OperationRepository,
-} from "../core/operations/repository.js";
-import type { RuntimeEventBus } from "../app/event-bus.js";
+} from "#core/operations/repository";
+import type { RuntimeEventBus } from "#app/event-bus";
 
 export class OperationLog {
   private readonly redactor = new SecretRedactor();

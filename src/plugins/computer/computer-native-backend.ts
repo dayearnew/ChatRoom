@@ -1,4 +1,4 @@
-import { ChatRoomError } from "../../core/errors/chatroom-error.js";
+import { ChatRoomError } from "#core/errors/chatroom-error";
 import { ComputerNativeHost } from "./computer-native-host.js";
 import { parseNativeResult } from "./computer-protocol.js";
 import type {

@@ -8,8 +8,8 @@ import {
   type RegistrationResponseJSON,
 } from "@simplewebauthn/server";
 import type { AuthenticatorTransportFuture } from "@simplewebauthn/server";
-import type { PasskeyRepository } from "../core/auth/passkey-repository.js";
-import { ChatRoomError } from "../core/errors/chatroom-error.js";
+import type { PasskeyRepository } from "#core/auth/passkey-repository";
+import { ChatRoomError } from "#core/errors/chatroom-error";
 import type { WebAuthnOrigin } from "./ingress-policy.js";
 
 type ChallengeKind = "registration" | "authentication";

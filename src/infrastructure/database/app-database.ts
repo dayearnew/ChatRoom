@@ -10,11 +10,16 @@ export class AppDatabase {
   constructor(databasePath: string) {
     mkdirSync(path.dirname(databasePath), { recursive: true, mode: 0o700 });
     this.raw = new DatabaseSync(databasePath);
-    this.raw.exec(
-      "PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;",
-    );
-    migrateDatabase(this.raw);
-    this.raw.exec(DATABASE_SCHEMA);
+    try {
+      this.raw.exec(
+        "PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;",
+      );
+      migrateDatabase(this.raw);
+      this.raw.exec(DATABASE_SCHEMA);
+    } catch (error) {
+      this.raw.close();
+      throw error;
+    }
   }
 
   close(): void {

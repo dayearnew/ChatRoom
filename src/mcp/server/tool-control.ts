@@ -1,5 +1,5 @@
 import type { RegisteredTool } from "@modelcontextprotocol/server";
-import { ChatRoomError } from "../../core/errors/chatroom-error.js";
+import { ChatRoomError } from "#core/errors/chatroom-error";
 
 export interface McpToolSettingStore {
   disabledTools(): string[];
@@ -44,6 +44,9 @@ export class McpToolControl {
     if (!tools) {
       tools = new Set();
       this.handles.set(name, tools);
+    } else {
+      for (const reference of tools)
+        if (!reference.deref()) tools.delete(reference);
     }
     tools.add(new WeakRef(tool));
     if (this.disabled.has(name)) tool.disable();

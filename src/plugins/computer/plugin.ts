@@ -1,10 +1,10 @@
-import type { InternalPlugin } from "../types.js";
-import { createServiceToken } from "../types.js";
+import type { InternalPlugin } from "#plugins/types";
+import { createServiceToken } from "#plugins/types";
 import { NativeComputerBackend } from "./computer-native-backend.js";
 import { ComputerService } from "./computer-service.js";
 import { ComputerSettingsRepository } from "./computer-settings-repository.js";
 import { registerComputerTools } from "./mcp.js";
-import { currentMcpAccessScope } from "../../mcp/server/request-context.js";
+import { currentMcpAccessScope } from "#mcp/server/request-context";
 
 export const ComputerServiceToken =
   createServiceToken<ComputerService>("computer");

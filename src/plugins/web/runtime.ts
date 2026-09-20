@@ -1,9 +1,9 @@
-import type { OperationLog } from "../../operations/operation-log.js";
-import type { ComputerService } from "../computer/computer-service.js";
-import type { GitService } from "../git/git-service.js";
-import type { ProcessSupervisor } from "../process/process-supervisor.js";
-import type { WorkspaceService } from "../workspace/workspace-service.js";
-import type { McpToolControl } from "../../mcp/server/tool-control.js";
+import type { OperationLog } from "#operations/operation-log";
+import type { ComputerService } from "#plugins/computer/computer-service";
+import type { GitService } from "#plugins/git/git-service";
+import type { ProcessSupervisor } from "#plugins/process/process-supervisor";
+import type { WorkspaceService } from "#plugins/workspace/workspace-service";
+import type { McpToolControl } from "#mcp/server/tool-control";
 
 export class WebRuntime {
   constructor(
@@ -29,7 +29,7 @@ export class WebRuntime {
   }
 
   listProcesses() {
-    return this.processes.list();
+    return this.processes.summaries();
   }
 
   getProcess(processId: string) {

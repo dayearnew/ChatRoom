@@ -5,6 +5,14 @@ import vuetify from "vite-plugin-vuetify";
 
 export default defineConfig({
   plugins: [vue(), vuetify({ autoImport: true })],
+  resolve: {
+    conditions: [
+      "chatroom-source",
+      "module",
+      "browser",
+      "development|production",
+    ],
+  },
   root: "src/plugins/web/ui",
   publicDir: false,
   build: {

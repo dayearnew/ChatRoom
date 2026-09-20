@@ -3,25 +3,29 @@ import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import express, { type RequestHandler } from "express";
+import express from "express";
 import compression from "compression";
 import { toNodeHandler } from "@modelcontextprotocol/node";
-import type { AuthInfo, McpHttpHandler } from "@modelcontextprotocol/server";
-import type { ChatRoomConfig } from "../../config/types.js";
-import type { WebRuntime } from "../../plugins/web/runtime.js";
-import type { RuntimeEventBus } from "../../app/event-bus.js";
-import type { ExternalAccessRegistry } from "../../app/external-access-registry.js";
-import type { AuthService } from "../../auth/auth-service.js";
-import type { PasskeyService } from "../../auth/passkey-service.js";
-import type { CloudController } from "../../plugins/cloud/controller.js";
-import { createApiRouter } from "../../plugins/web/http/api-router.js";
-import { createOAuthRouter } from "../../presentation/http/oauth-router.js";
-import { errorMiddleware } from "../../presentation/http/http-utils.js";
-import { IngressPolicy } from "../../auth/ingress-policy.js";
-import { CHATROOM_VERSION } from "../../core/runtime/identity.js";
-import { runWithMcpAccessScope } from "../../mcp/server/request-context.js";
-import type { SystemLogger } from "../logging/logger.js";
-import type { SystemLogReader } from "../logging/log-reader.js";
+import type { McpHttpHandler } from "@modelcontextprotocol/server";
+import type { ChatRoomConfig } from "#config/types";
+import type { WebRuntime } from "#plugins/web/runtime";
+import type { RuntimeEventBus } from "#app/event-bus";
+import type { ExternalAccessRegistry } from "#app/external-access-registry";
+import type { AuthService } from "#auth/auth-service";
+import type { PasskeyService } from "#auth/passkey-service";
+import type { CloudController } from "#plugins/cloud/controller";
+import { createApiRouter } from "#plugins/web/http/api-router";
+import { createOAuthRouter } from "#presentation/http/oauth-router";
+import { errorMiddleware } from "#presentation/http/http-utils";
+import { IngressPolicy } from "#auth/ingress-policy";
+import { CHATROOM_VERSION } from "#core/runtime/identity";
+import { runWithMcpAccessScope } from "#mcp/server/request-context";
+import type { LogService } from "#core/logging/types";
+import {
+  hostValidation,
+  mcpAuthentication,
+  webMutationOrigin,
+} from "./ingress-middleware.js";
 
 const WEB_UI_RESERVED_PREFIXES = [
   "/api",
@@ -46,8 +50,7 @@ export class HttpServer {
     private readonly mcp: McpHttpHandler,
     externalAccess: ExternalAccessRegistry,
     private readonly cloud: CloudController,
-    private readonly logger: SystemLogger,
-    private readonly logReader: SystemLogReader,
+    private readonly logs: LogService,
   ) {
     this.ingress = new IngressPolicy(config, externalAccess);
   }
@@ -60,7 +63,7 @@ export class HttpServer {
     app.use(compression({ threshold: 1024 }));
     app.use(express.json({ limit: "2mb" }));
     app.use(express.urlencoded({ extended: false, limit: "64kb" }));
-    app.use(createOAuthRouter(this.auth, this.ingress, this.logger));
+    app.use(createOAuthRouter(this.auth, this.ingress, this.logs));
     app.use("/api", webMutationOrigin(this.ingress));
     app.use(
       "/api",
@@ -71,8 +74,7 @@ export class HttpServer {
         this.passkeys,
         this.ingress,
         this.cloud,
-        this.logger,
-        this.logReader,
+        this.logs,
         () => ({
           version: CHATROOM_VERSION,
           mcpRequests: this.mcpRequestCount,
@@ -83,7 +85,7 @@ export class HttpServer {
 
     const nodeMcp = toNodeHandler(this.mcp, {
       onerror: (error) =>
-        this.logger.error("mcp", "mcp.error", "MCP request failed", { error }),
+        this.logs.error("mcp", "mcp.error", "MCP request failed", { error }),
     });
     app.all(
       "/mcp",
@@ -138,12 +140,12 @@ export class HttpServer {
           },
         );
       });
-      this.logger.info("http", "http.started", "HTTP server started", {
+      this.logs.info("http", "http.started", "HTTP server started", {
         host: this.config.server.host,
         port: this.config.server.port,
       });
     } catch (error) {
-      this.logger.error(
+      this.logs.error(
         "http",
         "http.start_failed",
         "HTTP server failed to start",
@@ -163,83 +165,34 @@ export class HttpServer {
   async close(): Promise<void> {
     const server = this.server;
     if (!server) return;
-    const closed = new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
-    );
-    await this.mcp.close();
-    server.closeAllConnections();
-    await closed;
     this.server = null;
-    this.logger.info("http", "http.stopped", "HTTP server stopped");
-  }
-}
 
-function webMutationOrigin(ingress: IngressPolicy): RequestHandler {
-  return (req, res, next) => {
-    if (
-      req.method === "GET" ||
-      req.method === "HEAD" ||
-      req.method === "OPTIONS"
-    ) {
-      next();
-      return;
-    }
-    const expectedOrigin = ingress.expectedWebOrigin(req);
-    if (!expectedOrigin) {
-      next();
-      return;
-    }
-    if (req.headers.origin !== expectedOrigin) {
-      res.status(403).json({
-        error: {
-          code: "FORBIDDEN",
-          message: "Request origin is not allowed",
-        },
-      });
-      return;
-    }
-    next();
-  };
-}
+    const errors: unknown[] = [];
+    const closed = server.listening
+      ? new Promise<void>((resolve, reject) =>
+          server.close((error) => (error ? reject(error) : resolve())),
+        )
+      : Promise.resolve();
 
-function hostValidation(ingress: IngressPolicy): RequestHandler {
-  return (req, res, next) => {
-    const hostname = req.hostname;
-    if (!hostname || !ingress.allowsHost(hostname)) {
-      res.status(403).json({
-        error: { code: "FORBIDDEN", message: "Host header is not allowed" },
-      });
-      return;
+    try {
+      await this.mcp.close();
+    } catch (error) {
+      errors.push(error);
     }
-    next();
-  };
-}
 
-function mcpAuthentication(
-  auth: AuthService,
-  ingress: IngressPolicy,
-): RequestHandler {
-  return (req, res, next) => {
-    if (!ingress.requiresMcpAuth(req)) {
-      next();
-      return;
+    server.closeAllConnections();
+    try {
+      await closed;
+    } catch (error) {
+      errors.push(error);
     }
-    const header = req.headers.authorization;
-    const token =
-      typeof header === "string" && header.startsWith("Bearer ")
-        ? header.slice(7)
-        : null;
-    const info = token ? auth.verifyMcpToken(token) : null;
-    if (!info) {
-      const base = ingress.mcpBaseUrl(req);
-      res.setHeader(
-        "WWW-Authenticate",
-        `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource/mcp"`,
+
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1)
+      throw new AggregateError(
+        errors,
+        "HTTP server shutdown encountered errors",
       );
-      res.status(401).json({ error: "invalid_token" });
-      return;
-    }
-    (req as unknown as { auth?: AuthInfo }).auth = info;
-    next();
-  };
+    this.logs.info("http", "http.stopped", "HTTP server stopped");
+  }
 }

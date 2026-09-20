@@ -1,10 +1,7 @@
 import { z } from "zod";
-import type { PluginMcpRegistrar } from "../../mcp/server/plugin-mcp-registrar.js";
-import {
-  closedRead,
-  openWorldMutation,
-} from "../../mcp/server/tool-support.js";
-import { currentMcpAccessScope } from "../../mcp/server/request-context.js";
+import type { PluginMcpRegistrar } from "#mcp/server/plugin-mcp-registrar";
+import { closedRead, openWorldMutation } from "#mcp/server/tool-support";
+import { currentMcpAccessScope } from "#mcp/server/request-context";
 import {
   auditActionOutput,
   auditComputerActions,

@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { ComputerAccessScope } from "../../plugins/computer/types.js";
+import type { ComputerAccessScope } from "#plugins/computer/types";
 
 const storage = new AsyncLocalStorage<ComputerAccessScope>();
 

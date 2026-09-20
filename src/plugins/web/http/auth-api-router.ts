@@ -3,15 +3,16 @@ import type {
   AuthenticationResponseJSON,
   RegistrationResponseJSON,
 } from "@simplewebauthn/server";
-import type { AuthService } from "../../../auth/auth-service.js";
-import type { IngressPolicy } from "../../../auth/ingress-policy.js";
-import type { PasskeyService } from "../../../auth/passkey-service.js";
-import type { SystemLogSink } from "../../../core/logging/types.js";
+import type { AuthService } from "#auth/auth-service";
+import type { IngressPolicy } from "#auth/ingress-policy";
+import type { PasskeyService } from "#auth/passkey-service";
+import type { LogWriter } from "#core/logging/types";
 import {
   asyncRoute,
+  bodyRecord,
   parseCookie,
   requireString,
-} from "../../../presentation/http/http-utils.js";
+} from "#presentation/http/http-utils";
 
 const SESSION_COOKIE = "chatroom_session";
 
@@ -19,7 +20,7 @@ export function createPublicAuthApiRouter(
   auth: AuthService,
   passkeys: PasskeyService,
   ingress: IngressPolicy,
-  logger: SystemLogSink,
+  logs: LogWriter,
 ): Router {
   const router = Router();
 
@@ -42,7 +43,7 @@ export function createPublicAuthApiRouter(
         res.json({ authenticated: true });
         return;
       }
-      const body = req.body as Record<string, unknown>;
+      const body = bodyRecord(req.body);
       try {
         const session = auth.createWebSession(
           requireString(body.ownerToken, "ownerToken"),
@@ -54,12 +55,12 @@ export function createPublicAuthApiRouter(
           session.maxAgeSeconds,
           ingress.secureWebCookie(req),
         );
-        logger.info("auth", "auth.success", "Web authentication succeeded", {
+        logs.info("auth", "auth.success", "Web authentication succeeded", {
           method: "owner_token",
         });
         res.json({ authenticated: true, expiresAt: session.expiresAt });
       } catch (error) {
-        logger.warn("auth", "auth.failed", "Web authentication failed", {
+        logs.warn("auth", "auth.failed", "Web authentication failed", {
           method: "owner_token",
           reason: "invalid_owner_token",
         });
@@ -80,7 +81,7 @@ export function createPublicAuthApiRouter(
   router.post(
     "/auth/passkey/verify",
     asyncRoute(async (req, res) => {
-      const body = req.body as Record<string, unknown>;
+      const body = bodyRecord(req.body);
       try {
         await passkeys.verifyAuthentication({
           challengeId: requireString(body.challengeId, "challengeId"),
@@ -93,14 +94,14 @@ export function createPublicAuthApiRouter(
           session.maxAgeSeconds,
           ingress.secureWebCookie(req),
         );
-        logger.info(
+        logs.info(
           "auth",
           "auth.passkey_success",
           "Passkey authentication succeeded",
         );
         res.json({ authenticated: true, expiresAt: session.expiresAt });
       } catch (error) {
-        logger.warn(
+        logs.warn(
           "auth",
           "auth.passkey_failed",
           "Passkey authentication failed",
@@ -115,7 +116,7 @@ export function createPublicAuthApiRouter(
     const token = sessionToken(req.headers.cookie);
     if (token) {
       auth.revokeWebSession(token);
-      logger.info("auth", "auth.logout", "Web session signed out");
+      logs.info("auth", "auth.logout", "Web session signed out");
     }
     const secure = ingress.secureWebCookie(req) ? "; Secure" : "";
     res.setHeader(
@@ -131,7 +132,7 @@ export function createPublicAuthApiRouter(
 export function createPrivateAuthApiRouter(
   passkeys: PasskeyService,
   ingress: IngressPolicy,
-  logger: SystemLogSink,
+  logs: LogWriter,
 ): Router {
   const router = Router();
 
@@ -145,17 +146,17 @@ export function createPrivateAuthApiRouter(
   router.post(
     "/auth/passkeys/register/verify",
     asyncRoute(async (req, res) => {
-      const body = req.body as Record<string, unknown>;
+      const body = bodyRecord(req.body);
       try {
         const passkey = await passkeys.verifyRegistration({
           challengeId: requireString(body.challengeId, "challengeId"),
           response: body.response as RegistrationResponseJSON,
           ...(typeof body.name === "string" ? { name: body.name } : {}),
         });
-        logger.info("auth", "auth.passkey_registered", "Passkey registered");
+        logs.info("auth", "auth.passkey_registered", "Passkey registered");
         res.status(201).json(passkey);
       } catch (error) {
-        logger.warn(
+        logs.warn(
           "auth",
           "auth.passkey_register_failed",
           "Passkey registration failed",
@@ -167,7 +168,7 @@ export function createPrivateAuthApiRouter(
   );
   router.delete("/auth/passkeys/:credentialId", (req, res) => {
     passkeys.remove(requireString(req.params.credentialId, "credentialId"));
-    logger.info("auth", "auth.passkey_removed", "Passkey removed");
+    logs.info("auth", "auth.passkey_removed", "Passkey removed");
     res.status(204).end();
   });
 

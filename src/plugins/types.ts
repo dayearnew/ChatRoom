@@ -1,11 +1,11 @@
-import type { ChatRoomConfig } from "../config/types.js";
-import type { AppDatabase } from "../infrastructure/database/app-database.js";
-import type { PluginMcpRegistrar } from "../mcp/server/plugin-mcp-registrar.js";
-import type { OperationLog } from "../operations/operation-log.js";
-import type { McpToolControl } from "../mcp/server/tool-control.js";
-import type { RuntimeEventBus } from "../app/event-bus.js";
-import type { ExternalAccessRegistry } from "../app/external-access-registry.js";
-import type { SystemLogSink } from "../core/logging/types.js";
+import type { ChatRoomConfig } from "#config/types";
+import type { AppDatabase } from "#infrastructure/database/app-database";
+import type { PluginMcpRegistrar } from "#mcp/server/plugin-mcp-registrar";
+import type { OperationLog } from "#operations/operation-log";
+import type { McpToolControl } from "#mcp/server/tool-control";
+import type { RuntimeEventBus } from "#app/event-bus";
+import type { ExternalAccessRegistry } from "#app/external-access-registry";
+import type { LogWriter } from "#core/logging/types";
 
 export interface ServiceToken<T> {
   readonly key: symbol;
@@ -39,7 +39,7 @@ export interface PluginContext {
   events: RuntimeEventBus;
   externalAccess: ExternalAccessRegistry;
   services: ServiceRegistry;
-  logger: SystemLogSink;
+  logs: LogWriter;
 }
 
 export interface InternalPlugin {

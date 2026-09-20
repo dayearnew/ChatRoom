@@ -11,7 +11,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
-import { ChatRoomError } from "../../core/errors/chatroom-error.js";
+import { ChatRoomError } from "#core/errors/chatroom-error";
 import type { WorkspaceFile } from "./types.js";
 
 export class WorkspaceFs {

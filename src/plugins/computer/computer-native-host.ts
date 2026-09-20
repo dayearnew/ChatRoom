@@ -9,7 +9,7 @@ import { createServer, type Server, type Socket } from "node:net";
 import { createInterface, type Interface } from "node:readline";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ChatRoomError } from "../../core/errors/chatroom-error.js";
+import { ChatRoomError } from "#core/errors/chatroom-error";
 import {
   COMPUTER_NATIVE_PROTOCOL_VERSION,
   nativeError,
@@ -74,8 +74,20 @@ export class ComputerNativeHost {
       method,
       params,
     })}\n`;
-    if (this.platform === "macos") this.socket!.write(line);
-    else this.child!.stdin.write(line);
+    const transportError = new ChatRoomError(
+      "INTERNAL",
+      "Computer helper transport is unavailable",
+    );
+    if (this.platform === "macos") {
+      const socket = this.socket;
+      if (!socket || socket.destroyed) this.rejectRequest(id, transportError);
+      else socket.write(line);
+    } else {
+      const child = this.child;
+      if (!child || child.killed || child.stdin.destroyed)
+        this.rejectRequest(id, transportError);
+      else child.stdin.write(line);
+    }
     return promise;
   }
 
@@ -239,10 +251,6 @@ export class ComputerNativeHost {
       windowsHide: process.platform === "win32",
       env,
     });
-    if (generation !== this.generation) {
-      child.kill();
-      throw new Error("Computer helper start was superseded");
-    }
     this.child = child;
     this.lines = createInterface({ input: child.stdout });
     this.lines.on("line", (line) => this.handleLine(line));
@@ -253,6 +261,12 @@ export class ComputerNativeHost {
     child.once("exit", () =>
       this.failTransport(child, new Error("Computer helper exited")),
     );
+
+    await waitForSpawn(child);
+    if (generation !== this.generation || this.child !== child) {
+      child.kill();
+      throw new Error("Computer helper start was superseded");
+    }
   }
 
   private failTransport(
@@ -289,6 +303,14 @@ export class ComputerNativeHost {
     this.child = null;
     this.cleanupSocketPath();
     this.rejectPending(error);
+  }
+
+  private rejectRequest(id: string, error: Error): void {
+    const item = this.pending.get(id);
+    if (!item) return;
+    this.pending.delete(id);
+    clearTimeout(item.timer);
+    item.reject(error);
   }
 
   private rejectPending(error: Error): void {
@@ -336,6 +358,31 @@ export class ComputerNativeHost {
     if (message.error) pending.reject(nativeError(message.error));
     else pending.resolve(message.result);
   }
+}
+
+function waitForSpawn(child: ChildProcessWithoutNullStreams): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onSpawn = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    const onExit = () => {
+      cleanup();
+      reject(new Error("Computer helper exited before startup"));
+    };
+    const cleanup = () => {
+      child.off("spawn", onSpawn);
+      child.off("error", onError);
+      child.off("exit", onExit);
+    };
+    child.once("spawn", onSpawn);
+    child.once("error", onError);
+    child.once("exit", onExit);
+  });
 }
 
 function requestTimeoutMs(method: ComputerNativeMethod): number {

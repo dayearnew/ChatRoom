@@ -1,5 +1,6 @@
 import { onBeforeUnmount, ref } from "vue";
 import { api, type RuntimeStatus, type UpdateStatus } from "../api.js";
+import { createRequestGate } from "../utils/requests.js";
 
 type ConnectionState = "connecting" | "connected" | "reconnecting" | "offline";
 
@@ -28,7 +29,9 @@ export function useRuntimeEvents() {
   let runtimeTimer: ReturnType<typeof setInterval> | null = null;
   let updateTimer: ReturnType<typeof setInterval> | null = null;
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
+  let lifecycle = 0;
   const pendingScopes = new Set<RefreshScope>();
+  const runtimeRequests = createRequestGate();
 
   onBeforeUnmount(stop);
 
@@ -45,6 +48,8 @@ export function useRuntimeEvents() {
   }
 
   function stop() {
+    lifecycle += 1;
+    runtimeRequests.invalidate();
     window.removeEventListener("online", handleOnline);
     window.removeEventListener("offline", handleOffline);
     stream?.close();
@@ -67,15 +72,19 @@ export function useRuntimeEvents() {
   }
 
   function connectEvents() {
-    stream = new EventSource("/api/events");
-    stream.addEventListener("open", () => {
+    const source = new EventSource("/api/events");
+    stream = source;
+    source.addEventListener("open", () => {
+      if (stream !== source) return;
       connectionState.value = "connected";
     });
-    stream.addEventListener("error", () => {
+    source.addEventListener("error", () => {
+      if (stream !== source) return;
       connectionState.value = navigator.onLine ? "reconnecting" : "offline";
       latencyMs.value = null;
     });
-    stream.addEventListener("runtime", (message) => {
+    source.addEventListener("runtime", (message) => {
+      if (stream !== source) return;
       const event = parseRuntimeEvent(message);
       if (!event) return;
       switch (event.type) {
@@ -112,11 +121,17 @@ export function useRuntimeEvents() {
   }
 
   async function loadRuntimeStatus() {
+    const request = runtimeRequests.begin();
     const startedAt = performance.now();
     try {
-      runtime.value = await api<RuntimeStatus>("/runtime");
+      const next = await api<RuntimeStatus>("/runtime", {
+        signal: request.signal,
+      });
+      if (!runtimeRequests.isCurrent(request)) return;
+      runtime.value = next;
       latencyMs.value = Math.max(0, Math.round(performance.now() - startedAt));
     } catch {
+      if (!runtimeRequests.isCurrent(request)) return;
       latencyMs.value = null;
       // Polling is best-effort; EventSource owns connection state.
       if (!navigator.onLine) connectionState.value = "offline";
@@ -138,7 +153,9 @@ export function useRuntimeEvents() {
   }
 
   async function loadUpdateStatus() {
+    const generation = lifecycle;
     if (!runtime.value?.version) await loadRuntimeStatus();
+    if (generation !== lifecycle) return;
     const currentVersion = runtime.value?.version;
     if (!currentVersion) return;
     try {
@@ -149,12 +166,13 @@ export function useRuntimeEvents() {
           signal: AbortSignal.timeout(5000),
         },
       );
-      if (!response.ok) return;
+      if (generation !== lifecycle || !response.ok) return;
       const release = (await response.json()) as {
         tag_name?: unknown;
         html_url?: unknown;
       };
-      if (typeof release.tag_name !== "string") return;
+      if (generation !== lifecycle || typeof release.tag_name !== "string")
+        return;
       const latestVersion = normalizeVersion(release.tag_name);
       updateStatus.value = {
         latestVersion,

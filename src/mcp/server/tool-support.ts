@@ -3,7 +3,7 @@ import {
   type ToolAnnotations,
 } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { asChatRoomError } from "../../core/errors/chatroom-error.js";
+import { asChatRoomError } from "#core/errors/chatroom-error";
 
 export const closedRead = {
   readOnlyHint: true,
